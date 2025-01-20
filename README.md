@@ -31,4 +31,4 @@
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 
 
-_Last updated at Tue Dec 24 19:44:52 UTC 2024_ 
+_Last updated at Mon Jan 20 09:20:25 UTC 2025_ 
