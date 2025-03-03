@@ -3,7 +3,6 @@
 
 | Script Name | Command |
 |-------------|---------|
-| move_to_sql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)` |
 | ng-self.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ng-self.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
@@ -31,4 +30,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Mon Mar  3 13:11:56 UTC 2025_ 
+_Last updated at Mon Mar  3 13:13:25 UTC 2025_ 
