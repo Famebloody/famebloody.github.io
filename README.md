@@ -26,8 +26,9 @@
 | swap.sh | `bash <(wget -qO- https://dignezzz.github.io/server/swap.sh)` |
 | stpush.sh | `bash <(wget -qO- https://dignezzz.github.io/server/stpush.sh)` |
 | sni.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni.sh)` |
+| mtu.sh | `bash <(wget -qO- https://dignezzz.github.io/server/mtu.sh)` |
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Tue Mar  4 22:30:51 UTC 2025_ 
+_Last updated at Tue Mar  4 22:31:49 UTC 2025_ 
