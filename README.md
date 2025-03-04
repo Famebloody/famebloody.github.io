@@ -19,7 +19,6 @@
 
 | Script Name | Command |
 |-------------|---------|
-| mtu2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/mtu2.sh)` |
 | sysctl_opt.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sysctl_opt.sh)` |
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
@@ -31,4 +30,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Tue Mar  4 22:28:09 UTC 2025_ 
+_Last updated at Tue Mar  4 22:30:51 UTC 2025_ 
