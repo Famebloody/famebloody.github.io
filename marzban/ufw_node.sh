@@ -90,13 +90,6 @@ fi
 
 
 
-# Добавляем правило для диапазона портов 5001-5010
-#ufw allow proto tcp from $ip_address to any port 5001:5010
-ufw allow proto tcp from any to any port 5001:5010
-
-# Добавляем правило для диапазона портов 6001-6010
-#ufw allow proto tcp from $ip_address to any port 6001:6010
-ufw allow proto tcp from any to any port 6001:6010
 # Добавляем правило для стандартных портов
 #ufw allow proto tcp from $ip_address to any port 62050:62051
 ufw allow proto tcp from any to any port 62050:62051
