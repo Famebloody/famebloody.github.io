@@ -15,6 +15,7 @@
 
 | Script Name | Command |
 |-------------|---------|
+| f2b.sh | `bash <(wget -qO- https://dignezzz.github.io/server/f2b.sh)` |
 | sysctl_opt.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sysctl_opt.sh)` |
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
@@ -28,4 +29,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Sun Apr 13 22:04:03 UTC 2025_ 
+_Last updated at Sun Apr 13 22:12:10 UTC 2025_ 
