@@ -160,18 +160,60 @@ org_info_lc="$(echo "$org_info" | tr '[:upper:]' '[:lower:]')"
 cert_info="$(echo | openssl s_client -connect "${host}:${port}" -servername "$host" 2>/dev/null | openssl x509 -noout -issuer -subject 2>/dev/null)"
 cert_info_lc="$(echo "$cert_info" | tr '[:upper:]' '[:lower:]')"
 
-if echo "$headers_lc $org_info_lc $cert_info_lc" | grep -q "cloudflare"; then
+# Объединим все строки в один блок (headers + org_info + cert_info)
+combined_info="$headers_lc $org_info_lc $cert_info_lc"
+
+if echo "$combined_info" | grep -qE "cloudflare|cf-ray"; then
   cdn_detected="Yes"
   cdn_provider="Cloudflare"
-elif echo "$headers_lc $org_info_lc $cert_info_lc" | grep -q "akamai"; then
+elif echo "$combined_info" | grep -qE "akamai|akamai.?technologies"; then
   cdn_detected="Yes"
   cdn_provider="Akamai"
-elif echo "$headers_lc $org_info_lc $cert_info_lc" | grep -q "fastly"; then
+elif echo "$combined_info" | grep -q "fastly"; then
   cdn_detected="Yes"
   cdn_provider="Fastly"
-elif echo "$headers_lc $org_info_lc $cert_info_lc" | grep -q "incapsula"; then
+elif echo "$combined_info" | grep -qE "incapsula|imperva"; then
   cdn_detected="Yes"
   cdn_provider="Imperva Incapsula"
+elif echo "$combined_info" | grep -q "sucuri"; then
+  cdn_detected="Yes"
+  cdn_provider="Sucuri"
+elif echo "$combined_info" | grep -qE "stackpath|highwinds"; then
+  cdn_detected="Yes"
+  cdn_provider="StackPath/Highwinds"
+elif echo "$combined_info" | grep -q "cdn77"; then
+  cdn_detected="Yes"
+  cdn_provider="CDN77"
+elif echo "$combined_info" | grep -q "edgecast"; then
+  cdn_detected="Yes"
+  cdn_provider="Verizon Edgecast"
+elif echo "$combined_info" | grep -q "keycdn"; then
+  cdn_detected="Yes"
+  cdn_provider="KeyCDN"
+elif echo "$combined_info" | grep -qE "microsoft|azure"; then
+  cdn_detected="Yes"
+  cdn_provider="Microsoft Azure CDN"
+elif echo "$combined_info" | grep -q "alibaba"; then
+  cdn_detected="Yes"
+  cdn_provider="Alibaba Cloud CDN"
+elif echo "$combined_info" | grep -q "tencent"; then
+  cdn_detected="Yes"
+  cdn_provider="Tencent Cloud CDN"
+elif echo "$combined_info" | grep -qE "vk|vkontakte|mail\\.ru"; then
+  cdn_detected="Yes"
+  cdn_provider="VK (Mail.ru)"
+elif echo "$combined_info" | grep -q "bunnycdn"; then
+  cdn_detected="Yes"
+  cdn_provider="BunnyCDN"
+elif echo "$combined_info" | grep -q "gcorelabs"; then
+  cdn_detected="Yes"
+  cdn_provider="G-Core Labs"
+elif echo "$combined_info" | grep -qE "arvancloud"; then
+  cdn_detected="Yes"
+  cdn_provider="ArvanCloud"
+elif echo "$combined_info" | grep -qE "verizon|level3|centurylink|limelight|lumen"; then
+  cdn_detected="Yes"
+  cdn_provider="Verizon/Level3/Limelight (Lumen)"
 fi
 
 if [ "$cdn_detected" == "Yes" ]; then
@@ -179,6 +221,7 @@ if [ "$cdn_detected" == "Yes" ]; then
 else
   echo "CDN Detected: No"
 fi
+
 
 # --- 8) Final verdict ---
 # Reality typically requires:
