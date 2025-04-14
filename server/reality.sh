@@ -521,6 +521,8 @@ function check_dest_for_reality() {
     echo "CDN Detected: No"
   fi
 
+echo
+echo
   # Final Verdict
   local verdict="Suitable"
   if [ "$tls13_supported" != "Yes" ] || [ "$http2_supported" != "Yes" ] || [ "$cdn_detected" == "Yes" ]; then
