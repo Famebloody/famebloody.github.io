@@ -1,220 +1,306 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Usage: ./check_sni.sh <domain>
+#
+# Скрипт проверяет пригодность домена как SNI для Xray Reality:
+#   1) DNS (A/AAAA), проверка приватных IP
+#   2) Пинг по первому IP
+#   3) TLS 1.3 и X25519
+#   4) HTTP/2, HTTP/3, редиректы
+#   5) Поиск CDN (заголовки + whois + ipinfo)
+# В конце показывает плюсы/минусы и рекомендуемые SNI.
+#
+# Cтремимся к совместимости с:
+#   - CentOS / RHEL
+#   - Debian / Ubuntu
+#   - (другие дистрибутивы, совместимые с yum или apt-get)
+#
+# При отсутствии нужных пакетов устанавливает их, выводя только мини-информацию.
+#
+# Убедитесь, что имеются права sudo, если нужно доустанавливать пакеты.
 
-domain="$1"
-if [[ -z "$domain" ]]; then
-    echo "Usage: $0 <domain>"
-    exit 1
+GREEN="\033[32m"
+RED="\033[31m"
+CYAN="\033[36m"
+YELLOW="\033[33m"
+RESET="\033[0m"
+
+if [ -z "$1" ]; then
+  echo -e "${RED}Usage: $0 <domain>${RESET}"
+  exit 1
 fi
 
-# Arrays to accumulate output points
+DOMAIN="$1"
 positives=()
 negatives=()
 
-# DNS resolution (A and AAAA records)
-dns_ips=$(dig +short A "$domain")
-dns_ips_v6=$(dig +short AAAA "$domain")
-if [[ -z "$dns_ips" && -z "$dns_ips_v6" ]]; then
-    negatives+=("DNS: домен не разрешается")
-    # If no DNS resolution, further checks cannot proceed
-else
-    # Count IPv4 and IPv6 addresses
-    count_v4=$(echo "$dns_ips" | sed '/^$/d' | wc -l)
-    count_v6=$(echo "$dns_ips_v6" | sed '/^$/d' | wc -l)
-    dns_msg="DNS: "
-    if [[ $count_v4 -gt 0 ]]; then
-        # IPv4 addresses present
-        if [[ $count_v4 -eq 1 ]]; then
-            dns_msg+="1 IPv4-адрес"
-        else
-            # Proper pluralization for Russian (адреса/адресов)
-            if [[ $((count_v4 % 100)) -ge 11 && $((count_v4 % 100)) -le 19 ]]; then
-                dns_msg+="$count_v4 IPv4-адресов"
-            else
-                case $((count_v4 % 10)) in
-                    1) dns_msg+="$count_v4 IPv4-адрес";;
-                    2|3|4) dns_msg+="$count_v4 IPv4-адреса";;
-                    *) dns_msg+="$count_v4 IPv4-адресов";;
-                esac
-            fi
-        fi
-    fi
-    if [[ $count_v6 -gt 0 ]]; then
-        # If both v4 and v6, separate with comma
-        [[ $count_v4 -gt 0 ]] && dns_msg+=", "
-        if [[ $count_v6 -eq 1 ]]; then
-            dns_msg+="1 IPv6-адрес"
-        else
-            if [[ $((count_v6 % 100)) -ge 11 && $((count_v6 % 100)) -le 19 ]]; then
-                dns_msg+="$count_v6 IPv6-адресов"
-            else
-                case $((count_v6 % 10)) in
-                    1) dns_msg+="$count_v6 IPv6-адрес";;
-                    2|3|4) dns_msg+="$count_v6 IPv6-адреса";;
-                    *) dns_msg+="$count_v6 IPv6-адресов";;
-                esac
-            fi
-        fi
-    fi
-    positives+=("$dns_msg")
+#########################################################
+# Определение пакетного менеджера
+#########################################################
+function detect_package_manager() {
+  if [ -f /etc/redhat-release ] || grep -iq 'centos' /etc/os-release 2>/dev/null; then
+    PKG_MGR="yum"
+  else
+    PKG_MGR="apt-get"
+  fi
+}
 
-    # Check for private/reserved IPs (which would be incorrect for public domain)
-    for ip in $dns_ips $dns_ips_v6; do
-        if [[ "$ip" =~ ^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^127\.|^169\.254\. ]] || [[ "$ip" == ::1 || "$ip" =~ ^fc00:|^fd00:|^fe80: ]]; then
-            negatives+=("DNS: возвращается приватный/зарезервированный IP ($ip)")
-        fi
-    done
+detect_package_manager
+
+#########################################################
+# Установка пакетов по необходимости (минимальный вывод)
+#########################################################
+function check_and_install_command() {
+  local cmd="$1"
+  if ! command -v "$cmd" &>/dev/null; then
+    echo "Installing $cmd..."
+    if [ "$PKG_MGR" = "yum" ]; then
+      sudo yum install -y "$cmd" >/dev/null 2>&1
+    else
+      sudo apt-get update -y >/dev/null 2>&1
+      sudo apt-get install -y "$cmd" >/dev/null 2>&1
+    fi
+    if ! command -v "$cmd" &>/dev/null; then
+      echo -e "${RED}Failed to install '$cmd'. Please install it manually.${RESET}"
+      exit 1
+    else
+      echo "$cmd installed successfully."
+    fi
+  fi
+}
+
+# Список команд, которые нужны
+NEEDED_CMDS=(openssl curl dig whois ping)
+for cmd in "${NEEDED_CMDS[@]}"; do
+  check_and_install_command "$cmd"
+done
+
+#########################################################
+# 1) Проверка DNS
+#########################################################
+dns_ips_v4=$(dig +short A "$DOMAIN" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+dns_ips_v6=$(dig +short AAAA "$DOMAIN" | grep -E '^[0-9A-Fa-f:]+$')
+
+if [ -z "$dns_ips_v4" ] && [ -z "$dns_ips_v6" ]; then
+  negatives+=("DNS: домен не разрешается")
+else
+  local_v4count=$(echo "$dns_ips_v4" | sed '/^$/d' | wc -l)
+  local_v6count=$(echo "$dns_ips_v6" | sed '/^$/d' | wc -l)
+  positives+=("DNS: найдено $local_v4count A-записей, $local_v6count AAAA-записей")
+
+  # Проверка приватных IP
+  for ip in $dns_ips_v4 $dns_ips_v6; do
+    if [[ "$ip" =~ ^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^127\.|^169\.254\. ]]; then
+      negatives+=("DNS: приватный IPv4 ($ip)")
+    elif [[ "$ip" =~ ^fc00:|^fd00:|^fe80:|^::1$ ]]; then
+      negatives+=("DNS: приватный IPv6 ($ip)")
+    fi
+  done
 fi
 
-# If domain resolved (positives contains DNS or negatives contains DNS issue)
-if [[ ! -z "$dns_ips$dns_ips_v6" ]]; then
-    # TLS 1.3 support check
-    openssl_out=$(echo | timeout 5 openssl s_client -connect "$domain:443" -servername "$domain" -tls1_3 2>&1)
-    if echo "$openssl_out" | grep -q "Protocol *: *TLSv1\.3"; then
-        positives+=("TLS 1.3: поддерживается")
-        tls13_supported=true
-        # X25519 support check (TLS 1.3)
-        if echo "$openssl_out" | grep -q "Server Temp Key: X25519" ; then
-            positives+=("X25519: поддерживается")
-        else
-            # Try forcing X25519
-            x25519_out=$(echo | timeout 5 openssl s_client -connect "$domain:443" -servername "$domain" -tls1_3 -curves X25519 2>&1)
-            if echo "$x25519_out" | grep -q "Protocol *: *TLSv1\.3"; then
-                positives+=("X25519: поддерживается")
-            else
-                negatives+=("X25519: не поддерживается")
-            fi
-        fi
-    else
-        # Determine reason for TLS1.3 failure if possible
-        if echo "$openssl_out" | grep -qi "unsupported protocol"; then
-            negatives+=("TLS 1.3: не поддерживается (только более старые версии)")
-        elif echo "$openssl_out" | grep -qi "handshake failure"; then
-            negatives+=("TLS 1.3: не поддерживается")
-        elif echo "$openssl_out" | grep -qi "Connection refused"; then
-            negatives+=("TLS: не удалось подключиться к порту 443")
-        elif echo "$openssl_out" | grep -qi "getaddrinfo: Name or service not known"; then
-            negatives+=("TLS: не удалось разрешить домен")
-        else
-            negatives+=("TLS 1.3: не поддерживается")
-        fi
-    fi
-
-    # HTTP/2 and HTTP/3 support, and redirect check using curl
-    curl_headers=$(curl -sI -k -m 8 "https://$domain")
-    if [[ -n "$curl_headers" ]]; then
-        # Check HTTP version from status line
-        status_line=$(echo "$curl_headers" | head -1)
-        if echo "$status_line" | grep -q "HTTP/2"; then
-            positives+=("HTTP/2: поддерживается")
-        else
-            negatives+=("HTTP/2: не поддерживается")
-        fi
-        # Check HTTP/3 via Alt-Svc header for h3 or draft versions
-        if echo "$curl_headers" | grep -qi "^Alt-Svc: .*h3"; then
-            positives+=("HTTP/3: поддерживается")
-        elif echo "$curl_headers" | grep -qi "^Alt-Svc: .*h3-"; then
-            positives+=("HTTP/3: поддерживается")
-        else
-            negatives+=("HTTP/3: не поддерживается")
-        fi
-        # Check for redirects (3xx status)
-        status_code=$(echo "$status_line" | awk '{print $2}')
-        if [[ "$status_code" =~ ^3 ]]; then
-            location=$(echo "$curl_headers" | grep -i "^Location:" | sed -e 's/Location: *//I')
-            if [[ -n "$location" ]]; then
-                negatives+=("Редирект: $location")
-            else
-                negatives+=("Редирект: присутствует")
-            fi
-        else
-            positives+=("Редиректы: отсутствуют")
-        fi
-    else
-        negatives+=("HTTP: нет ответа")
-    fi
-
-    # CDN detection via headers, certificate, ASN/org info
-    cdn_detected=""
-    cdn_name=""
-    ip_to_check=""
-    # Use the first resolved IP (prefer IPv4 over IPv6 for checks)
-    if [[ -n "$dns_ips" ]]; then
-        ip_to_check=$(echo "$dns_ips" | head -1)
-    elif [[ -n "$dns_ips_v6" ]]; then
-        ip_to_check=$(echo "$dns_ips_v6" | head -1)
-    fi
-    # Gather clues for CDN
-    combined_info="$curl_headers"$'\n'"$openssl_out"
-    if [[ -n "$ip_to_check" ]]; then
-        # ipinfo for org
-        ipinfo_org=$(curl -s -m 5 "https://ipinfo.io/$ip_to_check/org" || true)
-        # whois for additional clues
-        whois_out=$(timeout 5 whois "$ip_to_check" 2>/dev/null || true)
-        combined_info+=$'\n'"$ipinfo_org"$'\n'"$whois_out"
-    fi
-    combined_lc=$(echo "$combined_info" | tr '[:upper:]' '[:lower:]')
-    # Known CDN patterns
-    cdn_patterns=("cloudflare" "akamai" "fastly" "incapsula" "imperva" "sucuri" "stackpath" "cdn77" "edgecast" "keycdn" "azure" "tencent" "alibaba" "aliyun" "bunnycdn" "arvan" "g-core" "mail.ru" "vk" "limelight" "lumen" "level 3" "level3" "centurylink" "cloudfront" "verizon")
-    for cdn in "${cdn_patterns[@]}"; do
-        if [[ "$combined_lc" == *"$cdn"* ]]; then
-            cdn_detected="$cdn"
-            case "$cdn_detected" in
-                "cloudflare") cdn_name="Cloudflare";;
-                "akamai") cdn_name="Akamai";;
-                "fastly") cdn_name="Fastly";;
-                "incapsula"|"imperva") cdn_name="Imperva Incapsula";;
-                "sucuri") cdn_name="Sucuri";;
-                "stackpath") cdn_name="StackPath";;
-                "cdn77") cdn_name="CDN77";;
-                "edgecast"|"verizon") cdn_name="Verizon EdgeCast";;
-                "keycdn") cdn_name="KeyCDN";;
-                "azure") cdn_name="Azure CDN";;
-                "tencent") cdn_name="Tencent CDN";;
-                "alibaba"|"aliyun") cdn_name="Alibaba CDN";;
-                "bunnycdn") cdn_name="BunnyCDN";;
-                "arvan") cdn_name="ArvanCloud";;
-                "g-core") cdn_name="G-Core Labs";;
-                "mail.ru") cdn_name="Mail.ru CDN";;
-                "vk") cdn_name="VK CDN";;
-                "limelight") cdn_name="Limelight";;
-                "lumen") cdn_name="Lumen (CenturyLink)";;
-                "level 3"|"level3"|"centurylink") cdn_name="Level3/CenturyLink";;
-                "cloudfront") cdn_name="Amazon CloudFront";;
-                *) cdn_name="$cdn_detected";;
-            esac
-            break
-        fi
-    done
-    if [[ -n "$cdn_detected" ]]; then
-        negatives+=("CDN: обнаружен ($cdn_name)")
-    else
-        positives+=("CDN: не обнаружен")
-    fi
+#########################################################
+# 2) Пинг (берём первый доступный IP)
+#########################################################
+first_ip=""
+if [ -n "$dns_ips_v4" ]; then
+  first_ip=$(echo "$dns_ips_v4" | head -n1)
+elif [ -n "$dns_ips_v6" ]; then
+  first_ip=$(echo "$dns_ips_v6" | head -n1)
 fi
 
-# Output results
-echo "Положительные аспекты:"
-if [[ ${#positives[@]} -eq 0 ]]; then
-    echo " - не выявлено"
+if [ -n "$first_ip" ]; then
+  if [[ "$first_ip" =~ : ]]; then
+    # IPv6
+    if command -v ping6 &>/dev/null; then
+      ping_cmd="ping6"
+    else
+      ping_cmd="ping -6"
+    fi
+  else
+    ping_cmd="ping"
+  fi
+
+  # Отправим 4 пакета, таймаут ~1с
+  ping_out=$($ping_cmd -c4 -W1 "$first_ip" 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    # Проверяем потери
+    if echo "$ping_out" | grep -q " 0% packet loss"; then
+      avg_rtt=$(echo "$ping_out" | awk -F'/' '/rtt/ {print $5}')
+      positives+=("Ping: средний RTT ${avg_rtt} ms")
+    else
+      negatives+=("Ping: частичные потери (не все ответы)")
+    fi
+  else
+    negatives+=("Ping: узел не отвечает")
+  fi
 else
-    for p in "${positives[@]}"; do
-        echo " - $p"
-    done
+  negatives+=("Ping: нет IP для проверки")
 fi
-echo "Недостатки:"
-if [[ ${#negatives[@]} -eq 0 ]]; then
-    echo " - не выявлено"
+
+#########################################################
+# 3) Проверка TLS 1.3 и X25519
+#########################################################
+openssl_out=$(echo | timeout 5 openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" -tls1_3 2>&1)
+if echo "$openssl_out" | grep -q "Protocol  : TLSv1.3"; then
+  positives+=("TLS 1.3: поддерживается")
+  if echo "$openssl_out" | grep -q "Server Temp Key: X25519"; then
+    positives+=("X25519: поддерживается")
+  else
+    x25519_out=$(echo | timeout 5 openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" -tls1_3 -curves X25519 2>&1)
+    if echo "$x25519_out" | grep -q "Protocol  : TLSv1.3"; then
+      positives+=("X25519: поддерживается")
+    else
+      negatives+=("X25519: не поддерживается")
+    fi
+  fi
 else
-    for n in "${negatives[@]}"; do
-        echo " - $n"
-    done
+  negatives+=("TLS 1.3: не поддерживается")
+fi
+
+#########################################################
+# 4) Проверка HTTP/2, HTTP/3, редиректов
+#########################################################
+curl_headers=$(curl -sIk --max-time 8 "https://${DOMAIN}")
+if [ -z "$curl_headers" ]; then
+  negatives+=("HTTP: нет ответа (timeout/ошибка)")
+else
+  first_line=$(echo "$curl_headers" | head -n1)
+  if echo "$first_line" | grep -q "HTTP/2"; then
+    positives+=("HTTP/2: поддерживается")
+  else
+    negatives+=("HTTP/2: не поддерживается")
+  fi
+
+  if echo "$curl_headers" | grep -qi "^alt-svc: .*h3"; then
+    positives+=("HTTP/3: поддерживается")
+  else
+    negatives+=("HTTP/3: не поддерживается")
+  fi
+
+  # Проверка, не 3xx ли код
+  status_code=$(echo "$first_line" | awk '{print $2}')
+  if [[ "$status_code" =~ ^3[0-9]{2}$ ]]; then
+    loc=$(echo "$curl_headers" | grep -i '^Location:' | sed 's/Location: //i')
+    if [ -n "$loc" ]; then
+      negatives+=("Редирект: есть -> $loc")
+    else
+      negatives+=("Редирект: есть")
+    fi
+  else
+    positives+=("Редиректов нет")
+  fi
+fi
+
+#########################################################
+# 5) Проверка CDN
+#########################################################
+combined_info="$curl_headers"$'\n'"$openssl_out"
+
+if [ -n "$first_ip" ]; then
+  whois_out=$(timeout 5 whois "$first_ip" 2>/dev/null || true)
+  combined_info+=$'\n'"$whois_out"
+  ipinfo_org=$(curl -s --max-time 5 "https://ipinfo.io/$first_ip/org" || true)
+  combined_info+=$'\n'"$ipinfo_org"
+fi
+
+combined_lc=$(echo "$combined_info" | tr '[:upper:]' '[:lower:]')
+
+cdns=(
+  "\\bcloudflare\\b"
+  "\\bakamai\\b"
+  "\\bfastly\\b"
+  "\\bincapsula\\b"
+  "\\bimperva\\b"
+  "\\bsucuri\\b"
+  "\\bstackpath\\b"
+  "\\bcdn77\\b"
+  "\\bedgecast\\b"
+  "\\bkeycdn\\b"
+  "\\bazure\\b"
+  "\\btencent\\b"
+  "\\balibaba\\b"
+  "\\baliyun\\b"
+  "bunnycdn"
+  "\\barvan\\b"
+  "\\bg-core\\b"
+  "\\bmail\\.ru\\b"
+  "\\bmailru\\b"
+  "\\bvk\\.com\\b"
+  "\\bvk\\b"
+  "\\blimelight\\b"
+  "\\blumen\\b"
+  "\\blevel[[:space:]]?3\\b"
+  "\\bcenturylink\\b"
+  "\\bcloudfront\\b"
+  "\\bverizon\\b"
+)
+
+cdn_detected=""
+cdn_name=""
+for pattern in "${cdns[@]}"; do
+  if echo "$combined_lc" | grep -Eq "$pattern"; then
+    cdn_detected="$pattern"
+    case "$pattern" in
+      *cloudflare*) cdn_name="Cloudflare" ;;
+      *akamai*) cdn_name="Akamai" ;;
+      *fastly*) cdn_name="Fastly" ;;
+      *incapsula*|*imperva*) cdn_name="Imperva Incapsula" ;;
+      *sucuri*) cdn_name="Sucuri" ;;
+      *stackpath*) cdn_name="StackPath" ;;
+      *cdn77*) cdn_name="CDN77" ;;
+      *edgecast*|*verizon*) cdn_name="Verizon EdgeCast" ;;
+      *keycdn*) cdn_name="KeyCDN" ;;
+      *azure*) cdn_name="Azure CDN" ;;
+      *tencent*) cdn_name="Tencent CDN" ;;
+      *alibaba*|*aliyun*) cdn_name="Alibaba CDN" ;;
+      *bunnycdn*) cdn_name="BunnyCDN" ;;
+      *arvan*) cdn_name="ArvanCloud" ;;
+      *g-core*) cdn_name="G-Core Labs" ;;
+      *mail\.ru*|*mailru*) cdn_name="Mail.ru (VK) CDN" ;;
+      *vk\.com*) cdn_name="VK CDN" ;;
+      *vk*) cdn_name="VK CDN" ;;
+      *limelight*) cdn_name="Limelight" ;;
+      *lumen*) cdn_name="Lumen (CenturyLink)" ;;
+      *level[[:space:]]?3*) cdn_name="Level3/CenturyLink" ;;
+      *centurylink*) cdn_name="CenturyLink" ;;
+      *cloudfront*) cdn_name="Amazon CloudFront" ;;
+      *) cdn_name="$pattern" ;;
+    esac
+    break
+  fi
+done
+
+if [ -n "$cdn_detected" ]; then
+  negatives+=("CDN: обнаружена ($cdn_name)")
+else
+  positives+=("CDN: не обнаружена")
+fi
+
+#########################################################
+# 6) Вывод результатов
+#########################################################
+echo -e "\n${CYAN}===== РЕЗУЛЬТАТЫ ПРОВЕРКИ SNI =====${RESET}"
+
+if [ ${#positives[@]} -eq 0 ]; then
+  echo -e "${GREEN}Положительные аспекты: нет${RESET}"
+else
+  echo -e "${GREEN}Положительные аспекты:${RESET}"
+  for p in "${positives[@]}"; do
+    echo -e "  - $p"
+  done
+fi
+
+if [ ${#negatives[@]} -eq 0 ]; then
+  echo -e "${GREEN}\nНедостатки: нет${RESET}"
+else
+  echo -e "${RED}\nНедостатки:${RESET}"
+  for n in "${negatives[@]}"; do
+    echo -e "  - $n"
+  done
 fi
 
 echo -e "\n${CYAN}===== ВОЗМОЖНЫЕ ПУБЛИЧНЫЕ SNI (без Microsoft/Amazon/WhatsApp) =====${RESET}"
 echo -e "${GREEN}- dl.google.com${RESET} (Google Download, TLS 1.3, HTTP/2/3)"
-echo -e "${GREEN}- gateway.icloud.com${RESET} (Apple iCloud, очень быстрые узлы в Европе)"
+echo -e "${GREEN}- gateway.icloud.com${RESET} (Apple iCloud, узлы в Европе)"
 echo -e "${GREEN}- www.dropbox.com${RESET} (Dropbox, безопасный и популярный)"
 echo -e "${GREEN}- www.wikipedia.org${RESET} (Wikipedia, нейтральный, с HTTP/2/3)"
-
 exit 0
