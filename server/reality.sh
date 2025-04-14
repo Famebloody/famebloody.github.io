@@ -285,9 +285,9 @@ fi
 echo
 echo -e "${CYAN}===== OVERALL VERDICT =====${RESET}"
 if [ "$OV" = "Suitable" ]; then
-  echo -e "Overall: ${BG_GREEN} SUITABLE ${RESET}"
+  echo -e "Overall: ${BG_GREEN} SUITABLE / ПОДХОДИТ${RESET}"
 else
-  echo -e "Overall: ${BG_RED} NOT SUITABLE ${RESET}"
+  echo -e "Overall: ${BG_RED} NOT SUITABLE / НЕ ПОДХОДИТ ${RESET}"
 fi
 
 exit 0
