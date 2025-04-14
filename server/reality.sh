@@ -2,18 +2,11 @@
 # Usage: ./check_sni.sh <domain[:port]>
 #
 # Скрипт производит комплексную оценку домена для Xray Reality:
-#  1) Проверка домена на годность в качестве SNI (TLS 1.3, X25519, HTTP/2, HTTP/3, редиректы, CDN, пинг и т.д.).
-#  2) (В конце) Проверка этого же домена:порта (или домена:443 по умолчанию) на годность в качестве "dest" для Reality:
-#     - Пинг, TLS1.3, HTTP/2, отсутствие CDN и т.д.
+#   1) Проверка домена на годность в качестве SNI
+#   2) Проверка его же (домен:порт) на годность в качестве dest:
+#      выводит финальный цветной Verdict (Suitable / Not suitable)
 #
-# Работает на CentOS/Debian/Ubuntu (последние версии).
-# При отсутствии нужных утилит (openssl, curl, dig, whois, ping) — устанавливает их
-# с минимальным выводом (только «Installing ...», «installed successfully»).
-#
-# Пример:
-#   ./check.sh example.com
-#   ./check.sh example.com:443
-#
+
 
 GREEN="\033[32m"
 RED="\033[31m"
@@ -21,14 +14,13 @@ CYAN="\033[36m"
 YELLOW="\033[33m"
 RESET="\033[0m"
 
-#########################################################
-# 0) Определение домена и порта (если есть)
-#########################################################
+# Если аргумент пуст
 if [ -z "$1" ]; then
   echo -e "${RED}Usage: $0 <domain[:port]>${RESET}"
   exit 1
 fi
 
+# Парсинг domain[:port]
 INPUT="$1"
 if [[ "$INPUT" == *:* ]]; then
   DOMAIN="${INPUT%%:*}"
@@ -38,7 +30,6 @@ else
   PORT="443"
 fi
 
-# Проверка: порт должен быть числовым
 if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
   echo -e "${RED}Error: Port must be numeric.${RESET}"
   exit 1
@@ -47,9 +38,9 @@ fi
 positives=()
 negatives=()
 
-#########################################################
+##############################################################################
 # Определение пакетного менеджера (CentOS/Yum vs Debian/Apt)
-#########################################################
+##############################################################################
 function detect_package_manager() {
   if [ -f /etc/redhat-release ] || grep -iq 'centos' /etc/os-release 2>/dev/null; then
     PKG_MGR="yum"
@@ -60,9 +51,9 @@ function detect_package_manager() {
 
 detect_package_manager
 
-#########################################################
+##############################################################################
 # Установка пакетов по необходимости (минимальный вывод)
-#########################################################
+##############################################################################
 function check_and_install_command() {
   local cmd="$1"
   if ! command -v "$cmd" &>/dev/null; then
@@ -87,18 +78,18 @@ for cmd in "${NEEDED_CMDS[@]}"; do
   check_and_install_command "$cmd"
 done
 
-#########################################################
-# 1) Проверка DNS (для SNI-анализа)
-#########################################################
+##############################################################################
+# 1) Проверка DNS (A/AAAA), проверка приватных IP
+##############################################################################
 dns_ips_v4=$(dig +short A "$DOMAIN" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
 dns_ips_v6=$(dig +short AAAA "$DOMAIN" | grep -E '^[0-9A-Fa-f:]+$')
 
 if [ -z "$dns_ips_v4" ] && [ -z "$dns_ips_v6" ]; then
   negatives+=("DNS: домен не разрешается")
 else
-  local_v4count=$(echo "$dns_ips_v4" | sed '/^$/d' | wc -l)
-  local_v6count=$(echo "$dns_ips_v6" | sed '/^$/d' | wc -l)
-  positives+=("DNS: найдено $local_v4count A-записей, $local_v6count AAAA-записей")
+  count_v4=$(echo "$dns_ips_v4" | sed '/^$/d' | wc -l)
+  count_v6=$(echo "$dns_ips_v6" | sed '/^$/d' | wc -l)
+  positives+=("DNS: найдено $count_v4 A-записей, $count_v6 AAAA-записей")
 
   # Проверка приватных IP
   for ip in $dns_ips_v4 $dns_ips_v6; do
@@ -110,9 +101,9 @@ else
   done
 fi
 
-#########################################################
-# 2) Пинг (только по первому IP, для SNI-анализа)
-#########################################################
+##############################################################################
+# 2) Пинг (SNI)
+##############################################################################
 first_ip=""
 if [ -n "$dns_ips_v4" ]; then
   first_ip=$(echo "$dns_ips_v4" | head -n1)
@@ -138,7 +129,7 @@ if [ -n "$first_ip" ]; then
       avg_rtt=$(echo "$ping_out" | awk -F'/' '/rtt/ {print $5}')
       positives+=("Ping (для SNI): средний RTT ${avg_rtt} ms")
     else
-      negatives+=("Ping: потери пакетов (не все ответы)")
+      negatives+=("Ping: частичные потери (не все ответы)")
     fi
   else
     negatives+=("Ping: узел не отвечает")
@@ -147,9 +138,9 @@ else
   negatives+=("Ping: нет IP для проверки")
 fi
 
-#########################################################
-# 3) Проверка TLS 1.3 и X25519 (порт всегда 443 для SNI)
-#########################################################
+##############################################################################
+# 3) TLS 1.3 + X25519 (SNI)
+##############################################################################
 openssl_out=$(echo | timeout 5 openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" -tls1_3 2>&1)
 if echo "$openssl_out" | grep -q "Protocol  : TLSv1.3"; then
   positives+=("TLS 1.3 (SNI): поддерживается")
@@ -167,9 +158,9 @@ else
   negatives+=("TLS 1.3 (SNI): не поддерживается")
 fi
 
-#########################################################
-# 4) Проверка HTTP/2, HTTP/3, редиректы (для SNI)
-#########################################################
+##############################################################################
+# 4) HTTP/2, HTTP/3, Redirect (SNI)
+##############################################################################
 curl_headers=$(curl -sIk --max-time 8 "https://${DOMAIN}")
 if [ -z "$curl_headers" ]; then
   negatives+=("HTTP: нет ответа (timeout/ошибка)")
@@ -187,7 +178,7 @@ else
     negatives+=("HTTP/3 (SNI): не поддерживается")
   fi
 
-  # Редирект
+  # Проверка редиректа
   status_code=$(echo "$first_line" | awk '{print $2}')
   if [[ "$status_code" =~ ^3[0-9]{2}$ ]]; then
     loc=$(echo "$curl_headers" | grep -i '^Location:' | sed 's/Location: //i')
@@ -201,9 +192,9 @@ else
   fi
 fi
 
-#########################################################
-# 5) Проверка CDN (для SNI)
-#########################################################
+##############################################################################
+# 5) Проверка CDN (SNI)
+##############################################################################
 combined_info="$curl_headers"$'\n'"$openssl_out"
 
 if [ -n "$first_ip" ]; then
@@ -286,9 +277,9 @@ else
   positives+=("CDN (SNI): не обнаружен")
 fi
 
-#########################################################
-# 6) Вывод результатов проверки SNI
-#########################################################
+##############################################################################
+# Вывод результатов SNI
+##############################################################################
 echo -e "\n${CYAN}===== РЕЗУЛЬТАТЫ ПРОВЕРКИ ДОМЕНА ДЛЯ SNI =====${RESET}"
 if [ ${#positives[@]} -eq 0 ]; then
   echo -e "${GREEN}Положительные аспекты: нет${RESET}"
@@ -314,16 +305,14 @@ echo -e "${GREEN}- gateway.icloud.com${RESET} (Apple iCloud, узлы в Евр�
 echo -e "${GREEN}- www.dropbox.com${RESET} (Dropbox, безопасный и популярный)"
 echo -e "${GREEN}- www.wikipedia.org${RESET} (Wikipedia, нейтральный, с HTTP/2/3)"
 
-
-###############################################################################
-# 7) Дополнительная проверка (dest check) — та, что была во втором скрипте.
-###############################################################################
+##############################################################################
+# 6) Функция проверки dest
+##############################################################################
 function check_dest_for_reality() {
   local domain_port="$1"
-  # domain:port -> host / port
+
   local host_name
   local port_num
-
   if [[ "$domain_port" == *:* ]]; then
     host_name="${domain_port%%:*}"
     port_num="${domain_port##*:}"
@@ -332,15 +321,10 @@ function check_dest_for_reality() {
     port_num="443"
   fi
 
-  if ! [[ "$port_num" =~ ^[0-9]+$ ]]; then
-    echo "Error: Port must be numeric."
-    return
-  fi
-
   echo -e "\n${CYAN}===== DEST-ПРОВЕРКА ДЛЯ $host_name:$port_num =====${RESET}"
 
-  # Разрешаем IP
-  resolved_ip=""
+  # Разрешить IP
+  local resolved_ip=""
   if command -v getent >/dev/null 2>&1; then
     resolved_ip="$(getent hosts "$host_name" | awk '{ print $1; exit }')"
   fi
@@ -411,8 +395,8 @@ function check_dest_for_reality() {
   echo "TLS 1.3 Supported: $tls13_supported"
 
   # X25519 (опционально)
+  local x25519_supported="No"
   if [ "$tls13_supported" == "Yes" ]; then
-    local x25519_supported="No"
     if echo | openssl s_client -connect "${host_name}:${port_num}" -tls1_3 -curves X25519 -brief 2>/dev/null | grep -q "TLSv1.3"; then
       x25519_supported="Yes"
     fi
@@ -454,11 +438,12 @@ function check_dest_for_reality() {
     fi
   fi
 
-  # CDN detection
+  # CDN
   local cdn_detected="No"
   local cdn_provider=""
   local headers_lc
   headers_lc="$(echo "$headers" | tr '[:upper:]' '[:lower:]')"
+
   local org_info2=""
   if command -v curl >/dev/null 2>&1; then
     org_info2="$(curl -s --connect-timeout 5 --max-time 8 "https://ipinfo.io/${resolved_ip}/org" || true)"
@@ -470,6 +455,7 @@ function check_dest_for_reality() {
   cert_info="$(echo | openssl s_client -connect "${host_name}:${port_num}" -servername "$host_name" 2>/dev/null | openssl x509 -noout -issuer -subject 2>/dev/null)"
   local cert_info_lc
   cert_info_lc="$(echo "$cert_info" | tr '[:upper:]' '[:lower:]')"
+
   local combined_info_dest
   combined_info_dest="$headers_lc $org_info_lc $cert_info_lc"
 
@@ -532,16 +518,22 @@ function check_dest_for_reality() {
     echo "CDN Detected: No"
   fi
 
-  # Requirements: TLS1.3 + HTTP/2 + no CDN
+  # Final Verdict
   local verdict="Suitable"
   if [ "$tls13_supported" != "Yes" ] || [ "$http2_supported" != "Yes" ] || [ "$cdn_detected" == "Yes" ]; then
     verdict="Not suitable"
   fi
 
-  # Цветное выделение
   if [ "$verdict" = "Suitable" ]; then
     echo -e "Final Verdict: ${GREEN}Suitable${RESET} for Xray Reality"
   else
     echo -e "Final Verdict: ${RED}Not suitable${RESET} for Xray Reality"
   fi
 }
+
+##############################################################################
+# 7) Запустить проверку dest (домен + порт), чтобы увидеть Final Verdict
+##############################################################################
+check_dest_for_reality "${DOMAIN}:${PORT}"
+
+exit 0
