@@ -103,7 +103,6 @@ change_port() {
     local config_file="$1"
     local new_port="$2"
     local current_port=$(get_current_port "$config_file")
-    echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
 
     check_port_availability "$new_port"
     backup_file "$config_file"
@@ -125,7 +124,12 @@ main() {
     check_root
     detect_os
 
-    # Prompt for port once
+
+    local config_file="/etc/ssh/sshd_config"
+    local current_port=$(get_current_port "$config_file")
+    echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
+
+
     local new_port=$(prompt_for_port)
 
     if [[ "$os_name" == "Ubuntu" && "$os_version" == "24.04" ]]; then
