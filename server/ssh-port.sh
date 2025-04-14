@@ -101,11 +101,11 @@ check_firewall_rules() {
 
 change_port() {
     local config_file="$1"
+    local new_port="$2"
     local current_port=$(get_current_port "$config_file")
     echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
 
-    local new_port=$(prompt_for_port)
-
+    check_port_availability "$new_port"
     backup_file "$config_file"
     change_port_in_config "$config_file" "$new_port"
 
@@ -125,12 +125,15 @@ main() {
     check_root
     detect_os
 
+    # Prompt for port once
+    local new_port=$(prompt_for_port)
+
     if [[ "$os_name" == "Ubuntu" && "$os_version" == "24.04" ]]; then
         backup_file "/lib/systemd/system/ssh.socket"
-        sed -i "s/^ListenStream=.*/ListenStream=$(prompt_for_port)/" "/lib/systemd/system/ssh.socket"
-        change_port "/etc/ssh/sshd_config"
+        sed -i "s/^ListenStream=.*/ListenStream=$new_port/" "/lib/systemd/system/ssh.socket"
+        change_port "/etc/ssh/sshd_config" "$new_port"
     else
-        change_port "/etc/ssh/sshd_config"
+        change_port "/etc/ssh/sshd_config" "$new_port"
     fi
 
     echo -e "\e[34m----------------------------------------------------\e[0m"
