@@ -1,15 +1,5 @@
 #!/usr/bin/env bash
 # Usage: ./reality_check.sh <domain[:port]>
-#
-# Делает единый DNS резолв (A/AAAA). Сохранённый IP используется и для SNI, и для Dest.
-# Так CDN, пинг, заголовки, whois — будут одинаковыми.
-#
-# Логика Suitability по Xray Reality:
-#   - TLS 1.3 = Yes
-#   - HTTP/2 = Yes
-#   - CDN = No
-# (HTTP/3, X25519, редиректы, ping и т.п. выводим, но не влияют на verdict.)
-
 
 GREEN="\033[32m"
 RED="\033[31m"
@@ -24,7 +14,6 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-# Разбор domain[:port]
 INPUT="$1"
 if [[ "$INPUT" == *:* ]]; then
   DOMAIN="${INPUT%%:*}"
@@ -39,9 +28,6 @@ if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-##############################################################################
-# Определение пакетного менеджера
-##############################################################################
 function detect_package_manager() {
   if [ -f /etc/redhat-release ] || grep -iq 'centos' /etc/os-release 2>/dev/null; then
     PKG_MGR="yum"
@@ -49,11 +35,7 @@ function detect_package_manager() {
     PKG_MGR="apt-get"
   fi
 }
-detect_package_manager
 
-##############################################################################
-# Проверка/установка утилит
-##############################################################################
 function check_and_install_command() {
   local cmd="$1"
   if ! command -v "$cmd" &>/dev/null; then
@@ -72,18 +54,17 @@ function check_and_install_command() {
     fi
   fi
 }
+
+detect_package_manager
 NEEDED_CMDS=(openssl curl dig whois ping)
 for cmd in "${NEEDED_CMDS[@]}"; do
   check_and_install_command "$cmd"
 done
 
-##############################################################################
-# 1) Единый DNS резолв: A и AAAA
-##############################################################################
+# --- 1) DNS resolve
 dns_v4=$(dig +short A "$DOMAIN" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
 dns_v6=$(dig +short AAAA "$DOMAIN" | grep -E '^[0-9A-Fa-f:]+$')
 
-# Выберем первый IP для всех дальнейших проверок (как SNI, так и dest).
 main_ip=""
 if [ -n "$dns_v4" ]; then
   main_ip=$(echo "$dns_v4" | head -n1)
@@ -91,20 +72,16 @@ elif [ -n "$dns_v6" ]; then
   main_ip=$(echo "$dns_v6" | head -n1)
 fi
 
-##############################################################################
-# 2) Проверка DNS
-##############################################################################
-DNS_P=()  # positives
-DNS_N=()  # negatives
-
+DNS_P=()
+DNS_N=()
 if [ -z "$dns_v4" ] && [ -z "$dns_v6" ]; then
   DNS_N+=("DNS: домен не разрешается")
 else
-  local_v4count=$(echo "$dns_v4" | sed '/^$/d' | wc -l)
-  local_v6count=$(echo "$dns_v6" | sed '/^$/d' | wc -l)
-  DNS_P+=("DNS: $local_v4count A, $local_v6count AAAA")
+  c4=$(echo "$dns_v4" | sed '/^$/d' | wc -l)
+  c6=$(echo "$dns_v6" | sed '/^$/d' | wc -l)
+  DNS_P+=("DNS: $c4 A, $c6 AAAA")
 
-  # Проверка приватных
+  # Приватные IP
   for ip in $dns_v4 $dns_v6; do
     if [[ "$ip" =~ ^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^127\.|^169\.254\. ]]; then
       DNS_N+=("DNS: приватный IPv4 $ip")
@@ -114,14 +91,11 @@ else
   done
 fi
 
-##############################################################################
-# 3) Пинг по main_ip
-##############################################################################
+# --- 2) ping
 PING_P=()
 PING_N=()
-
 if [ -z "$main_ip" ]; then
-  PING_N+=("Ping: нет IP для проверки")
+  PING_N+=("Ping: нет IP")
 else
   ping_cmd="ping"
   if [[ "$main_ip" =~ : ]]; then
@@ -140,25 +114,20 @@ else
   fi
 fi
 
-##############################################################################
-# 4) Проверка TLS 1.3, X25519
-##############################################################################
+# --- 3) TLS
 TLS_P=()
 TLS_N=()
-
 if [ -n "$main_ip" ]; then
   tls_out=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_3 2>&1)
-  local tls13="No"
+  tls13="No"
   if echo "$tls_out" | grep -q "Protocol  : TLSv1.3"; then
     tls13="Yes"
-  fi
-  if [ "$tls13" = "Yes" ]; then
     TLS_P+=("TLS 1.3: Yes")
+
     # X25519
     if echo "$tls_out" | grep -q "Server Temp Key: X25519"; then
       TLS_P+=("X25519: Yes")
     else
-      # Пробуем явно curves X25519
       x2=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_3 -curves X25519 2>&1)
       if echo "$x2" | grep -q "Protocol  : TLSv1.3"; then
         TLS_P+=("X25519: Yes")
@@ -173,42 +142,31 @@ else
   TLS_N+=("TLS: нет IP => не проверено")
 fi
 
-##############################################################################
-# 5) HTTP/2, HTTP/3, Redirect
-##############################################################################
+# --- 4) HTTP
 HTTP_P=()
 HTTP_N=()
-
+curl_out=""
 if [ -n "$main_ip" ]; then
-  # Указываем curl --resolve, чтобы гарантированно обратиться к main_ip
-  # (SNI = $DOMAIN), порт = $PORT
-  # => это общий чек для SNI + dest
+  # --resolve
   curl_out=$(curl -sIk --max-time 8 --resolve "${DOMAIN}:${PORT}:${main_ip}" "https://${DOMAIN}:${PORT}")
   if [ -z "$curl_out" ]; then
     HTTP_N+=("HTTP: нет ответа")
   else
-    local line1
     line1=$(echo "$curl_out" | head -n1)
     if echo "$line1" | grep -q "HTTP/2"; then
       HTTP_P+=("HTTP/2: Yes")
     else
       HTTP_N+=("HTTP/2: No")
     fi
-
     if echo "$curl_out" | grep -qi "^alt-svc: .*h3"; then
       HTTP_P+=("HTTP/3: Yes")
     else
       HTTP_N+=("HTTP/3: No")
     fi
-
-    local sc
     sc=$(echo "$line1" | awk '{print $2}')
     if [[ "$sc" =~ ^3[0-9]{2}$ ]]; then
-      # редирект
       loc=$(echo "$curl_out" | grep -i '^Location:' | sed 's/Location: //i')
-      if [ -z "$loc" ]; then
-        loc="(no Location header?)"
-      fi
+      [ -z "$loc" ] && loc="(No Location?)"
       HTTP_N+=("Redirect: Yes -> $loc")
     else
       HTTP_P+=("Redirect: No")
@@ -218,12 +176,9 @@ else
   HTTP_N+=("HTTP: нет IP")
 fi
 
-##############################################################################
-# 6) CDN
-##############################################################################
+# --- 5) CDN
 CDN_P=()
 CDN_N=()
-
 CDN_DETECTED="No"
 CDN_NAME=""
 CDNS=(
@@ -236,19 +191,12 @@ CDNS=(
 )
 
 COMBINED_INFO=""
-
 if [ -n "$main_ip" ]; then
-  # Собираем SSL/HTTP
-  COMBINED_INFO+="$curl_out"
-  COMBINED_INFO+=$'\n'"$tls_out"
-
-  # whois
+  COMBINED_INFO="$curl_out"$'\n'"$tls_out"
   whois_out=$(timeout 5 whois "$main_ip" 2>/dev/null || true)
   COMBINED_INFO+=$'\n'"$whois_out"
-  # ipinfo
   ipinfo_org=$(curl -s --max-time 5 "https://ipinfo.io/$main_ip/org" || true)
   COMBINED_INFO+=$'\n'"$ipinfo_org"
-
   COMBINED_LC=$(echo "$COMBINED_INFO" | tr '[:upper:]' '[:lower:]')
 
   for pattern in "${CDNS[@]}"; do
@@ -293,86 +241,50 @@ else
   CDN_N+=("CDN: нет IP => не проверено")
 fi
 
-##############################################################################
-# Вывод всех результатов
-##############################################################################
-echo -e "\n${CYAN}===== DNS =====${RESET}"
-if [ ${#DNS_P[@]} -eq 0 ]; then
-  echo -e "${GREEN}Нет положительных DNS-аспектов${RESET}"
-else
-  for p in "${DNS_P[@]}"; do
-    echo -e "${GREEN}+ $p${RESET}"
-  done
+# --- Вывод ---
+echo
+echo -e "${CYAN}===== DNS =====${RESET}"
+for p in "${DNS_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for n in "${DNS_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
+
+echo
+echo -e "${CYAN}===== PING =====${RESET}"
+for p in "${PING_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for n in "${PING_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
+
+echo
+echo -e "${CYAN}===== TLS =====${RESET}"
+for p in "${TLS_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for n in "${TLS_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
+
+echo
+echo -e "${CYAN}===== HTTP =====${RESET}"
+for p in "${HTTP_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for n in "${HTTP_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
+
+echo
+echo -e "${CYAN}===== CDN =====${RESET}"
+for p in "${CDN_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for n in "${CDN_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
+
+# Overall verdict
+OV="Suitable"
+# Проверка TLS1.3
+if ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
+  OV="Not suitable"
 fi
-if [ ${#DNS_N[@]} -gt 0 ]; then
-  for n in "${DNS_N[@]}"; do
-    echo -e "${RED}- $n${RESET}"
-  done
+# Проверка HTTP/2
+if ! echo "${HTTP_P[@]}" | grep -q "HTTP/2: Yes"; then
+  OV="Not suitable"
 fi
-
-echo -e "\n${CYAN}===== PING =====${RESET}"
-if [ ${#PING_P[@]} -eq 0 ] && [ ${#PING_N[@]} -eq 0 ]; then
-  echo "No results"
-else
-  for p in "${PING_P[@]}"; do
-    echo -e "${GREEN}+ $p${RESET}"
-  done
-  for n in "${PING_N[@]}"; do
-    echo -e "${RED}- $n${RESET}"
-  done
-fi
-
-echo -e "\n${CYAN}===== TLS =====${RESET}"
-for p in "${TLS_P[@]}"; do
-  echo -e "${GREEN}+ $p${RESET}"
-done
-for n in "${TLS_N[@]}"; do
-  echo -e "${RED}- $n${RESET}"
-done
-
-echo -e "\n${CYAN}===== HTTP =====${RESET}"
-for p in "${HTTP_P[@]}"; do
-  echo -e "${GREEN}+ $p${RESET}"
-done
-for n in "${HTTP_N[@]}"; do
-  echo -e "${RED}- $n${RESET}"
-done
-
-echo -e "\n${CYAN}===== CDN =====${RESET}"
-for p in "${CDN_P[@]}"; do
-  echo -e "${GREEN}+ $p${RESET}"
-done
-for n in "${CDN_N[@]}"; do
-  echo -e "${RED}- $n${RESET}"
-done
-
-##############################################################################
-# Финальный verdict: TLS1.3=Yes, HTTP/2=Yes, CDN=No => Suitable
-##############################################################################
-function check_value() {
-  # ищем в positives/nаgatives
-  # param: "TLS 1.3: Yes" / "HTTP/2: Yes" / "CDN: нет"
-  local needed="$1"
-  if echo "${TLS_P[@]} ${HTTP_P[@]} ${CDN_P[@]}" | grep -q "$needed"; then
-    return 0
-  fi
-  return 1
-}
-
-OVERALL="Suitable"
-if ! check_value "TLS 1.3: Yes"; then
-  OVERALL="Not suitable"
-fi
-if ! check_value "HTTP/2: Yes"; then
-  OVERALL="Not suitable"
-fi
-
+# Проверка CDN
 if echo "${CDN_N[@]}" | grep -q "CDN: обнаружен"; then
-  OVERALL="Not suitable"
+  OV="Not suitable"
 fi
 
-echo -e "\n${CYAN}===== OVERALL VERDICT =====${RESET}"
-if [ "$OVERALL" = "Suitable" ]; then
+echo
+echo -e "${CYAN}===== OVERALL VERDICT =====${RESET}"
+if [ "$OV" = "Suitable" ]; then
   echo -e "Overall: ${BG_GREEN} SUITABLE ${RESET}"
 else
   echo -e "Overall: ${BG_RED} NOT SUITABLE ${RESET}"
