@@ -299,8 +299,7 @@ else
 fi
 
 echo -e "\n${CYAN}===== ВОЗМОЖНЫЕ ПУБЛИЧНЫЕ SNI (без Microsoft/Amazon/WhatsApp) =====${RESET}"
-echo -e "${GREEN}- dl.google.com${RESET} (Google Download, TLS 1.3, HTTP/2/3)"
 echo -e "${GREEN}- gateway.icloud.com${RESET} (Apple iCloud, узлы в Европе)"
 echo -e "${GREEN}- www.dropbox.com${RESET} (Dropbox, безопасный и популярный)"
-echo -e "${GREEN}- www.wikipedia.org${RESET} (Wikipedia, нейтральный, с HTTP/2/3)"
+echo -e "${GREEN}- www.wikipedia.org${RESET} (Wikipedia, нейтральный, с HTTP/2/3, но может быть высокий пинг)"
 exit 0
