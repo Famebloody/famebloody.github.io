@@ -11,10 +11,9 @@
 # с минимальным выводом (только «Installing ...», «installed successfully»).
 #
 # Пример:
-#   ./check_sni.sh example.com
-#   ./check_sni.sh example.com:443
+#   ./check.sh example.com
+#   ./check.sh example.com:443
 #
-# Автор: ChatGPT (доработан по запросам)
 
 GREEN="\033[32m"
 RED="\033[31m"
