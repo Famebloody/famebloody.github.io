@@ -28,7 +28,8 @@
 | sni.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni.sh)` |
 | mtu.sh | `bash <(wget -qO- https://dignezzz.github.io/server/mtu.sh)` |
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
+| sni2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni2.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Sun Apr 13 23:16:55 UTC 2025_ 
+_Last updated at Mon Apr 14 06:42:00 UTC 2025_ 
