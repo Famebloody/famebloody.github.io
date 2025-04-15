@@ -304,12 +304,21 @@ elif ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
     VERDICT_REASON="TLS 1.2 и 1.3 отсутствуют"
   fi
 fi
-if [ -n "$avg_rtt" ] && [ $(echo "$avg_rtt > 8" | bc -l) -eq 1 ]; then
-  OV="Potentially suitable"
-  if [ -z "$VERDICT_REASON" ]; then
-    VERDICT_REASON="слишком высокий пинг"
-  else
-    VERDICT_REASON="$VERDICT_REASON, слишком высокий пинг"
+if [ -n "$avg_rtt" ]; then
+  if [ $(echo "$avg_rtt >= 8" | bc -l) -eq 1 ]; then
+    OV="Not suitable"
+    if [ -z "$VERDICT_REASON" ]; then
+      VERDICT_REASON="слишком высокий пинг"
+    else
+      VERDICT_REASON="$VERDICT_REASON, слишком высокий пинг"
+    fi
+  elif [ $(echo "$avg_rtt >= 3" | bc -l) -eq 1 ]; then
+    OV="Potentially suitable"
+    if [ -z "$VERDICT_REASON" ]; then
+      VERDICT_REASON="средний пинг"
+    else
+      VERDICT_REASON="$VERDICT_REASON, средний пинг"
+    fi
   fi
 fi
 
