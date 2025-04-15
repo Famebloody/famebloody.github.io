@@ -24,6 +24,7 @@
 | security.sh | `bash <(wget -qO- https://dignezzz.github.io/server/security.sh)` |
 | reality2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality2.sh)` |
 | reality.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality.sh)` |
+| reality5.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality5.sh)` |
 | f2b-e.sh | `bash <(wget -qO- https://dignezzz.github.io/server/f2b-e.sh)` |
 | swap.sh | `bash <(wget -qO- https://dignezzz.github.io/server/swap.sh)` |
 | stpush.sh | `bash <(wget -qO- https://dignezzz.github.io/server/stpush.sh)` |
@@ -35,4 +36,4 @@
 | reality4.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality4.sh)` |
 
 
-_Last updated at Tue Apr 15 10:49:18 UTC 2025_ 
+_Last updated at Tue Apr 15 10:50:27 UTC 2025_ 
