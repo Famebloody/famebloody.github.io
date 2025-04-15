@@ -82,7 +82,6 @@ else
   c6=$(echo "$dns_v6" | sed '/^$/d' | wc -l)
   DNS_P+=("DNS: $c4 A, $c6 AAAA")
 
-  # Приватные IP
   for ip in $dns_v4 $dns_v6; do
     if [[ "$ip" =~ ^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^127\.|^169\.254\. ]]; then
       DNS_N+=("DNS: приватный IPv4 $ip")
@@ -125,7 +124,6 @@ if [ -n "$main_ip" ]; then
     tls13="Yes"
     TLS_P+=("TLS 1.3: Yes")
 
-    # X25519
     if echo "$tls_out" | grep -q "Server Temp Key: X25519"; then
       TLS_P+=("X25519: Yes")
     else
@@ -155,7 +153,6 @@ HTTP_P=()
 HTTP_N=()
 curl_out=""
 if [ -n "$main_ip" ]; then
-  # --resolve
   curl_out=$(curl -sIk --max-time 8 --resolve "${DOMAIN}:${PORT}:${main_ip}" "https://${DOMAIN}:${PORT}")
   if [ -z "$curl_out" ]; then
     HTTP_N+=("HTTP: нет ответа")
@@ -249,7 +246,7 @@ else
   CDN_N+=("CDN: нет IP => не проверено")
 fi
 
-# --- Вывод ---
+
 echo
 echo -e "${CYAN}===== DNS =====${RESET}"
 for p in "${DNS_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
@@ -287,6 +284,7 @@ elif ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
   else
     OV="Not suitable"
   fi
+fi
 
 echo
 echo -e "${CYAN}===== OVERALL VERDICT =====${RESET}"
