@@ -7,6 +7,7 @@ CYAN="\033[36m"
 YELLOW="\033[33m"
 BG_GREEN="\033[30;42m"
 BG_RED="\033[97;41m"
+BG_YELLOW="\033[30;43m"
 RESET="\033[0m"
 
 if [ -z "$1" ]; then
@@ -136,7 +137,14 @@ if [ -n "$main_ip" ]; then
       fi
     fi
   else
-    TLS_N+=("TLS 1.3: No")
+    tls12_out=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_2 2>&1)
+    if echo "$tls12_out" | grep -q "Protocol  : TLSv1.2"; then
+      TLS_P+=("TLS 1.2: Yes")
+      TLS_N+=("TLS 1.3: No")
+    else
+      TLS_N+=("TLS 1.3: No")
+      TLS_N+=("TLS 1.2: No")
+    fi
   fi
 else
   TLS_N+=("TLS: нет IP => не проверено")
@@ -269,23 +277,23 @@ for n in "${CDN_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
 
 # Overall verdict
 OV="Suitable"
-# Проверка TLS1.3
-if ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
-  OV="Not suitable"
-fi
-# Проверка HTTP/2
-if ! echo "${HTTP_P[@]}" | grep -q "HTTP/2: Yes"; then
-  OV="Not suitable"
-fi
-# Проверка CDN
 if echo "${CDN_N[@]}" | grep -q "CDN: обнаружен"; then
   OV="Not suitable"
-fi
+elif ! echo "${HTTP_P[@]}" | grep -q "HTTP/2: Yes"; then
+  OV="Not suitable"
+elif ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
+  if echo "${TLS_P[@]}" | grep -q "TLS 1.2: Yes"; then
+    OV="Potentially suitable"
+  else
+    OV="Not suitable"
+  fi
 
 echo
 echo -e "${CYAN}===== OVERALL VERDICT =====${RESET}"
 if [ "$OV" = "Suitable" ]; then
   echo -e "Overall: ${BG_GREEN} SUITABLE / ПОДХОДИТ${RESET}"
+elif [ "$OV" = "Potentially suitable" ]; then
+  echo -e "Overall: ${BG_YELLOW} POTENTIALLY SUITABLE / ПОТЕНЦИАЛЬНО ПОДХОДИТ (TLS 1.3 отсутствует)${RESET}"
 else
   echo -e "Overall: ${BG_RED} NOT SUITABLE / НЕ ПОДХОДИТ ${RESET}"
 fi
