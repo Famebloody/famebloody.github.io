@@ -108,7 +108,13 @@ else
   ping_out=$($ping_cmd -c4 -W1 "$main_ip" 2>/dev/null)
   if [ $? -eq 0 ] && echo "$ping_out" | grep -q "0% packet loss"; then
     avg_rtt=$(echo "$ping_out" | awk -F'/' '/rtt/ {print $5}')
-    PING_P+=("Ping: ~${avg_rtt} ms")
+    if [ $(echo "$avg_rtt < 3" | bc -l) -eq 1 ]; then
+      PING_P+=("Ping: ~${avg_rtt} ms (отличный результат)")
+    elif [ $(echo "$avg_rtt < 8" | bc -l) -eq 1 ]; then
+      PING_P+=("Ping: ~${avg_rtt} ms (средний результат)")
+    else
+      PING_P+=("Ping: ~${avg_rtt} ms (слишком высокий)")
+    fi
   else
     PING_N+=("Ping: нет ответа или потери")
   fi
@@ -246,7 +252,7 @@ else
   CDN_N+=("CDN: нет IP => не проверено")
 fi
 
-
+# --- Вывод ---
 echo
 echo -e "${CYAN}===== DNS =====${RESET}"
 for p in "${DNS_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
@@ -254,7 +260,15 @@ for n in "${DNS_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
 
 echo
 echo -e "${CYAN}===== PING =====${RESET}"
-for p in "${PING_P[@]}"; do echo -e "${GREEN}+ $p${RESET}"; done
+for p in "${PING_P[@]}"; do
+  if echo "$p" | grep -q "отличный результат"; then
+    echo -e "${GREEN}+ $p${RESET}"
+  elif echo "$p" | grep -q "средний результат"; then
+    echo -e "${YELLOW}+ $p${RESET}"
+  else
+    echo -e "${RED}+ $p${RESET}"
+  fi
+done
 for n in "${PING_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
 
 echo
@@ -274,15 +288,28 @@ for n in "${CDN_N[@]}"; do echo -e "${RED}- $n${RESET}"; done
 
 # Overall verdict
 OV="Suitable"
+VERDICT_REASON=""
 if echo "${CDN_N[@]}" | grep -q "CDN: обнаружен"; then
   OV="Not suitable"
+  VERDICT_REASON="CDN обнаружен"
 elif ! echo "${HTTP_P[@]}" | grep -q "HTTP/2: Yes"; then
   OV="Not suitable"
+  VERDICT_REASON="HTTP/2 отсутствует"
 elif ! echo "${TLS_P[@]}" | grep -q "TLS 1.3: Yes"; then
   if echo "${TLS_P[@]}" | grep -q "TLS 1.2: Yes"; then
     OV="Potentially suitable"
+    VERDICT_REASON="TLS 1.3 отсутствует"
   else
     OV="Not suitable"
+    VERDICT_REASON="TLS 1.2 и 1.3 отсутствуют"
+  fi
+fi
+if [ -n "$avg_rtt" ] && [ $(echo "$avg_rtt > 8" | bc -l) -eq 1 ]; then
+  OV="Potentially suitable"
+  if [ -z "$VERDICT_REASON" ]; then
+    VERDICT_REASON="слишком высокий пинг"
+  else
+    VERDICT_REASON="$VERDICT_REASON, слишком высокий пинг"
   fi
 fi
 
@@ -291,9 +318,9 @@ echo -e "${CYAN}===== OVERALL VERDICT =====${RESET}"
 if [ "$OV" = "Suitable" ]; then
   echo -e "Overall: ${BG_GREEN} SUITABLE / ПОДХОДИТ${RESET}"
 elif [ "$OV" = "Potentially suitable" ]; then
-  echo -e "Overall: ${BG_YELLOW} POTENTIALLY SUITABLE / ПОТЕНЦИАЛЬНО ПОДХОДИТ (TLS 1.3 отсутствует)${RESET}"
+  echo -e "Overall: ${BG_YELLOW} POTENTIALLY SUITABLE / ПОТЕНЦИАЛЬНО ПОДХОДИТ ($VERDICT_REASON)${RESET}"
 else
-  echo -e "Overall: ${BG_RED} NOT SUITABLE / НЕ ПОДХОДИТ ${RESET}"
+  echo -e "Overall: ${BG_RED} NOT SUITABLE / НЕ ПОДХОДИТ ($VERDICT_REASON)${RESET}"
 fi
 
 exit 0
