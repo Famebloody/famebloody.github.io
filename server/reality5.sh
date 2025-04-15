@@ -159,7 +159,7 @@ HTTP_P=()
 HTTP_N=()
 curl_out=""
 if [ -n "$main_ip" ]; then
-  curl_out=$(curl -sIk --max-time 8 --resolve "${DOMAIN}:${PORT}:${main_ip}" "https://${DOMAIN}:${htags PORT}")
+  curl_out=$(curl -sIk --max-time 8 --resolve "${DOMAIN}:${PORT}:${main_ip}" "https://${DOMAIN}:${PORT}")
   if [ -z "$curl_out" ]; then
     HTTP_N+=("HTTP: нет ответа")
   else
