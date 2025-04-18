@@ -22,6 +22,7 @@
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 | security.sh | `bash <(wget -qO- https://dignezzz.github.io/server/security.sh)` |
 | reality.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality.sh)` |
+| ufw-check.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-check.sh)` |
 | f2b-e.sh | `bash <(wget -qO- https://dignezzz.github.io/server/f2b-e.sh)` |
 | swap.sh | `bash <(wget -qO- https://dignezzz.github.io/server/swap.sh)` |
 | stpush.sh | `bash <(wget -qO- https://dignezzz.github.io/server/stpush.sh)` |
@@ -32,4 +33,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Tue Apr 15 11:23:32 UTC 2025_ 
+_Last updated at Fri Apr 18 08:50:43 UTC 2025_ 
