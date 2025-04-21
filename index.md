@@ -4,61 +4,66 @@ title: DigneZzZ Scripts Hub
 ---
 
 <link rel="stylesheet" href="https://unpkg.com/simpledotcss/simple.min.css">
+<style>
+  .category {
+    border: 1px solid #ddd;
+    padding: 1em;
+    border-radius: 10px;
+    margin-bottom: 1em;
+    transition: 0.2s ease;
+    background-color: #fdfdfd;
+  }
+  .category:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .category h2 {
+    margin-top: 0;
+  }
+  .category p {
+    margin-bottom: 0.5em;
+  }
+  .category a {
+    display: inline-block;
+    font-weight: bold;
+    text-decoration: none;
+    color: #007acc;
+  }
+  .category a:hover {
+    text-decoration: underline;
+  }
+  .footer-links {
+    margin-top: 2em;
+    text-align: center;
+    font-size: 0.9em;
+  }
+</style>
 
 <header>
-  <h1>🧠 dignezzz.github.io</h1>
-  <p>Твоя личная библиотека скриптов и гайдов — чисто, понятно и по делу.</p>
-
-  <div class="language-switcher" style="margin-top: 1em;">
-      <button id="ru" class="active">🇷🇺 Русский</button>
-      <button id="en">🇬🇧 English</button>
-  </div>
+  <h1>🧠 DigneZzZ Script Hub</h1>
+  <p>All-in-one script library. Minimal, clean, and battle-tested.</p>
 </header>
 
 <main>
-  <!-- Категория: Marzban -->
-  <section class="lang ru">
+  <section class="category">
     <h2>⚙️ Marzban</h2>
-    <p>Скрипты по установке, автоматизации и мониторингу Marzban.</p>
-    {% include_relative categories/readme.md %}
-  </section>
-  <section class="lang en" style="display:none;">
-    <h2>⚙️ Marzban</h2>
-    <p>Scripts for Marzban installation, automation, and monitoring.</p>
-    {% include_relative categories/readme.md %}
+    <p>Scripts for installing, automating, and monitoring Marzban.</p>
+    <a href="./marzban/README.md">→ View Marzban Scripts</a>
   </section>
 
-  <!-- Категория: Сервер -->
-  <section class="lang ru">
-    <h2>🖥️ Сервер</h2>
-    <p>Общие серверные скрипты: SSH, swap, fail2ban, панели управления.</p>
-    {% include_relative categories/readme.md %}
-  </section>
-  <section class="lang en" style="display:none;">
+  <section class="category">
     <h2>🖥️ Server</h2>
-    <p>General server scripts: SSH, swap, fail2ban, control panels.</p>
-    {% include_relative categories/readme.md %}
+    <p>General-purpose server scripts: SSH, swap, fail2ban, control panels, and more.</p>
+    <a href="./server/README.md">→ View Server Scripts</a>
   </section>
 
-  <!-- Форум и подписки -->
-  <hr>
-  <section class="lang ru">
-    <p>🔗 Мой форум: <a href="https://openode.xyz">openode.xyz</a> | <a href="https://openode.xyz/subscriptions/">Подписки</a></p>
+  <section class="category">
+    <h2>📊 All Scripts</h2>
+    <p>Automatically generated list of all scripts across all categories.</p>
+    <a href="./README.md">→ View Global Script Index</a>
   </section>
-  <section class="lang en" style="display:none;">
-    <p>🔗 My forum: <a href="https://openode.xyz">openode.xyz</a> | <a href="https://openode.xyz/subscriptions/">Subscriptions</a></p>
-  </section>
+
+  <div class="footer-links">
+    🔗 <a href="https://openode.xyz">Forum</a> |
+    💡 <a href="https://openode.xyz/subscriptions/">Subscriptions</a>
+  </div>
 </main>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-  $(function() {
-    $('.language-switcher button').click(function() {
-      const lang = $(this).attr('id');
-      $('.lang').hide();
-      $('.' + lang).show();
-      $('.language-switcher button').removeClass('active');
-      $(this).addClass('active');
-    });
-  });
-</script>
