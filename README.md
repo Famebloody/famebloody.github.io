@@ -34,4 +34,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Mon Apr 21 10:35:30 UTC 2025_ 
+_Last updated at Mon Apr 21 10:41:29 UTC 2025_ 
