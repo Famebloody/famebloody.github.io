@@ -20,24 +20,24 @@ title: DigneZzZ Scripts Hub
   <section class="lang ru">
     <h2>⚙️ Marzban</h2>
     <p>Скрипты по установке, автоматизации и мониторингу Marzban.</p>
-    {% include_relative categories/marzban.md %}
+    {% include_relative categories/readme.md %}
   </section>
   <section class="lang en" style="display:none;">
     <h2>⚙️ Marzban</h2>
     <p>Scripts for Marzban installation, automation, and monitoring.</p>
-    {% include_relative categories/marzban.md %}
+    {% include_relative categories/readme.md %}
   </section>
 
   <!-- Категория: Сервер -->
   <section class="lang ru">
     <h2>🖥️ Сервер</h2>
     <p>Общие серверные скрипты: SSH, swap, fail2ban, панели управления.</p>
-    {% include_relative categories/server.md %}
+    {% include_relative categories/readme.md %}
   </section>
   <section class="lang en" style="display:none;">
     <h2>🖥️ Server</h2>
     <p>General server scripts: SSH, swap, fail2ban, control panels.</p>
-    {% include_relative categories/server.md %}
+    {% include_relative categories/readme.md %}
   </section>
 
   <!-- Форум и подписки -->
