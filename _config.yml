@@ -2,7 +2,7 @@ title: "dignezzz.github.io"
 description: "Основная страница всех публикаций."
 baseurl: ""
 url: "https://dignezzz.github.io"
-theme: minima
+theme: none
 markdown: kramdown
 plugins:
   - jekyll-include-relative
