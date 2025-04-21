@@ -1,55 +1,64 @@
 ---
 layout: default
-title: dignezzz.github.io
+title: DigneZzZ Scripts Hub
 ---
 
-<div class="language-switcher">
-    <img src="https://flagcdn.com/32x24/ru.png" alt="Русский" id="ru" class="active">
-    <img src="https://flagcdn.com/32x24/gb.png" alt="English" id="en">
-</div>
+<link rel="stylesheet" href="https://unpkg.com/simpledotcss/simple.min.css">
 
-<!-- Контент на русском -->
-<div class="lang ru">
-    <h1>dignezzz.github.io</h1>
-    <p>Основная страница всех публикаций.</p>
-    <p>Инфа будет позже.</p>
-    <p>
-        Мой форум: <a href="https://openode.xyz">https://openode.xyz</a><br>
-        На форуме действуют подписки для доступа к Клубам (в т.ч. по Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
-        В клубе собраны циклы статей по полноценной установке этой и других панелей, обеспечения удобства и безопасного доступа. А также эксклюзивный дизайн подписки.
-    </p>
-</div>
+<header>
+  <h1>🧠 dignezzz.github.io</h1>
+  <p>Твоя личная библиотека скриптов и гайдов — чисто, понятно и по делу.</p>
 
-<!-- Контент на английском -->
-<div class="lang en" style="display:none;">
-    <h1>dignezzz.github.io</h1>
-    <p>Main page for all publications.</p>
-    <p>Information will be available later.</p>
-    <p>
-        My forum: <a href="https://openode.xyz">https://openode.xyz</a><br>
-        Subscriptions are available on the forum for access to Clubs (including Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
-        The club contains cycles of articles on the full installation of this and other panels, ensuring convenience and secure access. As well as an exclusive subscription design.
-    </p>
-</div>
+  <div class="language-switcher" style="margin-top: 1em;">
+      <button id="ru" class="active">🇷🇺 Русский</button>
+      <button id="en">🇬🇧 English</button>
+  </div>
+</header>
 
-<hr>
+<main>
+  <!-- Категория: Marzban -->
+  <section class="lang ru">
+    <h2>⚙️ Marzban</h2>
+    <p>Скрипты по установке, автоматизации и мониторингу Marzban.</p>
+    {% include_relative categories/marzban.md %}
+  </section>
+  <section class="lang en" style="display:none;">
+    <h2>⚙️ Marzban</h2>
+    <p>Scripts for Marzban installation, automation, and monitoring.</p>
+    {% include_relative categories/marzban.md %}
+  </section>
 
-<div markdown="1">
-    {% include_relative README.md %}
-</div>
+  <!-- Категория: Сервер -->
+  <section class="lang ru">
+    <h2>🖥️ Сервер</h2>
+    <p>Общие серверные скрипты: SSH, swap, fail2ban, панели управления.</p>
+    {% include_relative categories/server.md %}
+  </section>
+  <section class="lang en" style="display:none;">
+    <h2>🖥️ Server</h2>
+    <p>General server scripts: SSH, swap, fail2ban, control panels.</p>
+    {% include_relative categories/server.md %}
+  </section>
+
+  <!-- Форум и подписки -->
+  <hr>
+  <section class="lang ru">
+    <p>🔗 Мой форум: <a href="https://openode.xyz">openode.xyz</a> | <a href="https://openode.xyz/subscriptions/">Подписки</a></p>
+  </section>
+  <section class="lang en" style="display:none;">
+    <p>🔗 My forum: <a href="https://openode.xyz">openode.xyz</a> | <a href="https://openode.xyz/subscriptions/">Subscriptions</a></p>
+  </section>
+</main>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    $(document).ready(function() {
-        // Переключение языков
-        $('.language-switcher img').click(function() {
-            var selectedLang = $(this).attr('id');
-            $('.lang').hide();  // Скрываем все языковые блоки
-            $('.' + selectedLang).show();  // Показываем только выбранный язык
-
-            // Устанавливаем активный флажок
-            $('.language-switcher img').removeClass('active');
-            $(this).addClass('active');
-        });
+  $(function() {
+    $('.language-switcher button').click(function() {
+      const lang = $(this).attr('id');
+      $('.lang').hide();
+      $('.' + lang).show();
+      $('.language-switcher button').removeClass('active');
+      $(this).addClass('active');
     });
+  });
 </script>
