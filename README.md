@@ -16,7 +16,7 @@
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 
-_Last updated at Tue Apr 22 01:17:09 MSK 2025_ 
+_Last updated at Tue Apr 22 01:19:00 MSK 2025_ 
 
 ## server
 
@@ -43,6 +43,6 @@ _Last updated at Tue Apr 22 01:17:09 MSK 2025_
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
-_Last updated at Tue Apr 22 01:17:09 MSK 2025_ 
+_Last updated at Tue Apr 22 01:19:00 MSK 2025_ 
 
-_Global README auto-generated at Tue Apr 22 01:17:09 MSK 2025_ 
+_Global README auto-generated at Tue Apr 22 01:19:00 MSK 2025_ 
