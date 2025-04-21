@@ -1,8 +1,6 @@
-title: "dignezzz.github.io"
-description: "Основная страница всех публикаций."
+title: "DigneZzZ Scripts"
+description: "Скрипты, гайды и утилиты от DigneZzZ"
 baseurl: ""
 url: "https://dignezzz.github.io"
-theme: none
+theme: null
 markdown: kramdown
-plugins:
-  - jekyll-include-relative
