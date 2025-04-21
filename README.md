@@ -17,6 +17,7 @@
 |-------------|---------|
 | f2b.sh | `bash <(wget -qO- https://dignezzz.github.io/server/f2b.sh)` |
 | dest2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest2.sh)` |
+| dashboard.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dashboard.sh)` |
 | sysctl_opt.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sysctl_opt.sh)` |
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
@@ -33,4 +34,4 @@
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
 
-_Last updated at Fri Apr 18 08:50:43 UTC 2025_ 
+_Last updated at Mon Apr 21 10:35:30 UTC 2025_ 
