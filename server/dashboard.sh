@@ -51,7 +51,16 @@ uptime_str=$(uptime -p)
 loadavg=$(cut -d ' ' -f1-3 /proc/loadavg)
 cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8 "%"}')
 mem_data=$(free -m | awk '/Mem:/ {printf "%.0f%% (%dMB/%dMB)", $3/$2*100, $3, $2}')
-disk=$(df -h / | awk 'NR==2 {print $5 " (" $3 " / " $2 ")"}')
+# Disk
+disk_used=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
+disk_line=$(df -h / | awk 'NR==2 {print $5 " (" $3 " / " $2 ")"}')
+if [ "$disk_used" -ge 95 ]; then
+    disk_status="${red}${disk_line}${normal} ${red}[CRITICAL: Free up space immediately!]${normal}"
+elif [ "$disk_used" -ge 85 ]; then
+    disk_status="${yellow}${disk_line}${normal} ${yellow}[Warning: High usage]${normal}"
+else
+    disk_status="${green}${disk_line}${normal}"
+fi
 traffic=$(vnstat --oneline 2>/dev/null | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
 ip_local=$(hostname -I | awk '{print $1}')
 ip_public=$(curl -s ifconfig.me || echo "n/a")
@@ -115,7 +124,7 @@ printf "${bold}🧠 Uptime:        ${normal} %s\n" "$uptime_str"
 printf "${bold}🧮 Load Average:  ${normal} %s\n" "$loadavg"
 printf "${bold}⚙️  CPU Usage:     ${normal} %s\n" "$cpu_usage"
 printf "${bold}💾 RAM Usage:     ${normal} %s\n" "$mem_data"
-printf "${bold}💽 Disk Usage:    ${normal} %s\n" "$disk"
+printf "${bold}💽 Disk Usage:    ${normal} %b\n" "$disk_status"
 printf "${bold}📡 Net Traffic:   ${normal} %s\n" "$traffic"
 printf "${bold}🔐 CrowdSec:      ${normal} %b\n" "$crowdsec_status"
 printf "${bold}🐳 Docker:        ${normal} %b\n" "$docker_msg"
