@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # Для возможности коммита изменений
+  contents: write
   pages: write
   id-token: write
 
@@ -21,42 +21,67 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate README with script commands
+      - name: Set up Git config
         run: |
-          echo "# Scripts" > README.md
+          git config user.name "GitHub Action"
+          git config user.email "dignezzz@gmail.com"
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint all .sh scripts
+        run: |
+          find . -name "*.sh" -exec shellcheck {} \;
+
+      - name: Cache README data (if needed in future)
+        uses: actions/cache@v4
+        with:
+          path: README.md
+          key: ${{ runner.os }}-readme-cache-${{ hashFiles('**/*.sh') }}
+
+      - name: Generate powerful README with script commands
+        run: |
+          echo "# 🚀 Scripts" > README.md
+          echo "" >> README.md
+          echo "![Build Status](https://github.com/${{ github.repository }}/actions/workflows/static.yml/badge.svg)" >> README.md
+          echo "" >> README.md
+
           for dir in marzban server; do
             echo "## $dir" >> README.md
-            echo "" >> README.md  # Добавляем пустую строку перед таблицей
+            echo "" >> README.md
             echo "| Script Name | Command |" >> README.md
             echo "|-------------|---------|" >> README.md
-            for file in $(find $dir -type f -name "*.sh"); do
+            for file in $(find $dir -type f -name "*.sh" | sort); do
               script_name=$(basename $file)
               command="\`bash <(wget -qO- https://dignezzz.github.io/$file)\`"
               echo "| $script_name | $command |" >> README.md
             done
-            echo "" >> README.md  # Добавляем пустую строку после таблицы
+            echo "" >> README.md
           done
-          echo "" >> README.md
-          echo "_Last updated at $(date)_ " >> README.md  # Добавляем метку с датой и временем
 
-      - name: Commit README changes
+          echo "_Last updated at $(TZ='Europe/Moscow' date)_ " >> README.md
+
+      - name: Validate README formatting
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "dignezzz@gmail.com"
+          grep -q '| Script Name | Command |' README.md || (echo "README format invalid" && exit 1)
+
+      - name: Commit README changes (if any)
+        run: |
           git add README.md
-          git commit -m "Auto-generate README with script links at $(date)" || echo "No changes to commit"
-          git push
+          git diff --cached --quiet || git commit -m "📄 Auto-generate README with script links ($(date +'%Y-%m-%d %H:%M'))"
+          git push || echo "No changes to push"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload artifact for Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+          retention-days: 3
 
       - name: Deploy to GitHub Pages
         id: deployment
