@@ -31,7 +31,7 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
-CURRENT_VERSION="2024.04.23_5"
+CURRENT_VERSION="2024.04.23_6"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
@@ -144,6 +144,7 @@ echo "👥 SSH Sessions:  $ssh_users"
 echo "🔗 SSH IPs:       $ssh_ips"
 echo "🌐 IP Address:    Local: $ip_local | Public: $ip_public"
 echo "🌍 IPv6 Address:   $ip6"
+echo "🧬 Kernel:         $(uname -r)"
 echo "⬆️  Updates:       $update_msg"
 echo "🔐 SSH Port:      $ssh_port_status"
 echo "🚫 Root Login:    $root_login_status"
