@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+declare -a unused_ports=()
+declare -a missing_ports=()
 
 # ufw-cleaner: автоматическая проверка и очистка неиспользуемых портов UFW
 # Поддерживает --dry-run и логирование
@@ -437,8 +439,9 @@ cleanup() {
 
 main() {
   ensure_root
-  parse_rules
-  check_used
+parse_rules
+missing_ports=()
+check_used
   add_ssh
   print_table
   cleanup
