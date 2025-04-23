@@ -127,10 +127,19 @@ password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{
 [ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
 
 if dpkg -l | grep -q unattended-upgrades; then
-    auto_update_status="$ok enabled"
+    if grep -q 'Unattended-Upgrade "1";' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null; then
+        if systemctl is-enabled apt-daily.timer &>/dev/null && systemctl is-enabled apt-daily-upgrade.timer &>/dev/null; then
+            auto_update_status="$ok enabled"
+        else
+            auto_update_status="$warn config enabled, but timers are disabled"
+        fi
+    else
+        auto_update_status="$warn installed, but disabled in config"
+    fi
 else
-    auto_update_status="$warn not installed"
+    auto_update_status="$fail not installed"
 fi
+
 
 echo "🧠 Uptime:        $uptime_str"
 echo "🧮 Load Average:  $loadavg"
