@@ -31,32 +31,24 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
-CURRENT_VERSION="2024.04.23_4"
+CURRENT_VERSION="2024.04.23_2"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
-bold=$(tput bold)
-normal=$(tput sgr0)
-blue=$(tput setaf 4)
-green=$(tput setaf 2)
-red=$(tput setaf 1)
-yellow=$(tput setaf 3)
-cyan=$(tput setaf 6)
-white=$(tput setaf 7)
-ok="${green}●${normal}"
-fail="${red}●${normal}"
-warn="${yellow}●${normal}"
-separator="${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${normal}"
+ok="✅"
+fail="❌"
+warn="⚠️"
+separator="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
-    echo "${yellow}🔔 Доступна новая версия MOTD-дашборда:${normal} ${green}$REMOTE_VERSION${normal} ${bold}(текущая: $CURRENT_VERSION)${normal}"
-    echo "${cyan}💡 Обновление:${normal}"
-    echo "   ${bold}curl -fsSL $REMOTE_URL | bash -s -- --force${normal}"
+    echo "${warn} Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+    echo "💡 Обновление:"
+    echo "   curl -fsSL $REMOTE_URL | bash -s -- --force"
     echo ""
 fi
 
-echo "${normal}"
-echo "${white}  — powered by https://NeoNode.cc${normal}"
+echo ""
+echo "  — powered by https://NeoNode.cc"
 echo "$separator"
 
 uptime_str=$(uptime -p)
@@ -66,11 +58,11 @@ mem_data=$(free -m | awk '/Mem:/ {printf "%.0f%% (%dMB/%dMB)", $3/$2*100, $3, $2
 disk_used=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
 disk_line=$(df -h / | awk 'NR==2 {print $5 " (" $3 " / " $2 ")"}')
 if [ "$disk_used" -ge 95 ]; then
-    disk_status="${red}${disk_line}${normal} ${red}[CRITICAL: Free up space immediately!]❌${normal}"
+    disk_status="$fail $disk_line [CRITICAL: Free up space immediately!]"
 elif [ "$disk_used" -ge 85 ]; then
-    disk_status="${yellow}${disk_line}${normal} ${yellow}[Warning: High usage]⚠️${normal}"
+    disk_status="$warn $disk_line [Warning: High usage]"
 else
-    disk_status="${green}${disk_line}${normal}"
+    disk_status="$ok $disk_line"
 fi
 traffic=$(vnstat --oneline 2>/dev/null | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
 ip_local=$(hostname -I | awk '{print $1}')
@@ -80,9 +72,9 @@ ip6=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d/ -f1
 
 if systemctl is-active crowdsec &>/dev/null; then
     bouncers=$(crowdsec-cli bouncers list 2>/dev/null | grep -v NAME | awk '{print $1 ": " $2}' | paste -sd ', ')
-    [ -z "$bouncers" ] && crowdsec_status="$warn active, but no bouncers ⚠️" || crowdsec_status="$ok $bouncers"
+    [ -z "$bouncers" ] && crowdsec_status="$warn active, but no bouncers" || crowdsec_status="$ok $bouncers"
 else
-    crowdsec_status="$fail not running ❌"
+    crowdsec_status="$fail not running"
 fi
 
 if command -v docker &>/dev/null; then
@@ -95,7 +87,7 @@ if command -v docker &>/dev/null; then
         docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped\n$bad_containers"
     fi
 else
-    docker_msg="$warn not installed ⚠️"
+    docker_msg="$warn not installed"
 fi
 
 ssh_users=$(who | wc -l)
@@ -104,7 +96,7 @@ ssh_ips=$(who | awk '{print $5}' | tr -d '()' | sort | uniq | paste -sd ', ' -)
 if command -v fail2ban-client &>/dev/null; then
     fail2ban_status="$ok active"
 else
-    fail2ban_status="$fail not installed ❌"
+    fail2ban_status="$fail not installed"
 fi
 
 if command -v ufw &>/dev/null; then
@@ -112,10 +104,10 @@ if command -v ufw &>/dev/null; then
     if [[ "$ufw_status" == "active" ]]; then
         ufw_status="$ok enabled"
     else
-        ufw_status="$fail disabled ❌"
+        ufw_status="$fail disabled"
     fi
 else
-    ufw_status="$fail not installed ❌"
+    ufw_status="$fail not installed"
 fi
 
 updates=$(apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
@@ -124,49 +116,49 @@ update_msg="${updates} package(s) can be updated"
 # 🔐 Безопасность: проверка настроек SSH
 ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
 [ -z "$ssh_port" ] && ssh_port=22
-[ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22) ⚠️"
+[ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
 
 permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}')
-[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled ❌"
+[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled"
 
 password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
-[ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled ❌"
+[ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
 
 if dpkg -l | grep -q unattended-upgrades; then
     auto_update_status="$ok enabled"
 else
-    auto_update_status="$warn not installed ⚠️"
+    auto_update_status="$warn not installed"
 fi
 
-printf "${bold}🧠 Uptime:        ${normal} %s\n" "$uptime_str"
-printf "${bold}🧮 Load Average:  ${normal} %s\n" "$loadavg"
-printf "${bold}⚙️  CPU Usage:     ${normal} %s\n" "$cpu_usage"
-printf "${bold}💾 RAM Usage:     ${normal} %s\n" "$mem_data"
-printf "${bold}💽 Disk Usage:    ${normal} %b\n" "$disk_status"
-printf "${bold}📡 Net Traffic:   ${normal} %s\n" "$traffic"
-printf "${bold}🔐 CrowdSec:      ${normal} %b\n" "$crowdsec_status"
-printf "${bold}🐳 Docker:        ${normal} %b\n" "$docker_msg"
-printf "${bold}👮 Fail2ban:      ${normal} %s\n" "$fail2ban_status"
-printf "${bold}🧱 UFW Firewall:  ${normal} %s\n" "$ufw_status"
-printf "${bold}👥 SSH Sessions:  ${normal} %s\n" "$ssh_users"
-printf "${bold}🔗 SSH IPs:       ${normal} %s\n" "$ssh_ips"
-printf "${bold}🌐 IP Address:    ${normal} Local: $ip_local | Public: $ip_public\n"
-printf "${bold}🌍 IPv6 Address:   ${normal} $ip6\n"
-printf "${bold}⬆️  Updates:       ${normal} $update_msg\n"
-printf "${bold}🔐 SSH Port:      ${normal} %s\n" "$ssh_port_status"
-printf "${bold}🚫 Root Login:    ${normal} %s\n" "$root_login_status"
-printf "${bold}🔑 Password Auth: ${normal} %s\n" "$password_auth_status"
-printf "${bold}📦 Auto Updates:  ${normal} %s\n" "$auto_update_status"
-printf "${bold}🆕 Dashboard Ver: ${normal} $CURRENT_VERSION\n"
+echo "🧠 Uptime:        $uptime_str"
+echo "🧮 Load Average:  $loadavg"
+echo "⚙️  CPU Usage:     $cpu_usage"
+echo "💾 RAM Usage:     $mem_data"
+echo "💽 Disk Usage:    $disk_status"
+echo "📡 Net Traffic:   $traffic"
+echo "🔐 CrowdSec:      $crowdsec_status"
+echo "🐳 Docker:        $docker_msg"
+echo "👮 Fail2ban:      $fail2ban_status"
+echo "🧱 UFW Firewall:  $ufw_status"
+echo "👥 SSH Sessions:  $ssh_users"
+echo "🔗 SSH IPs:       $ssh_ips"
+echo "🌐 IP Address:    Local: $ip_local | Public: $ip_public"
+echo "🌍 IPv6 Address:   $ip6"
+echo "⬆️  Updates:       $update_msg"
+echo "🔐 SSH Port:      $ssh_port_status"
+echo "🚫 Root Login:    $root_login_status"
+echo "🔑 Password Auth: $password_auth_status"
+echo "📦 Auto Updates:  $auto_update_status"
+echo "🆕 Dashboard Ver: $CURRENT_VERSION"
 echo "$separator"
 echo ""
-echo "${bold}✔️  SYSTEM CHECK SUMMARY:${normal}"
-[ "$updates" -eq 0 ] && echo "$ok Packages up to date" || echo "$warn Updates available ⚠️"
-[[ "$docker_msg" == *"Issues:"* ]] && echo "$fail Docker issue ❌" || echo "$ok Docker OK"
-[[ "$crowdsec_status" =~ "$fail" ]] && echo "$fail CrowdSec not working ❌" || echo "$ok CrowdSec OK"
-[[ "$fail2ban_status" =~ "$fail" ]] && echo "$fail Fail2ban not installed ❌" || echo "$ok Fail2ban OK"
-[[ "$ufw_status" =~ "$fail" ]] && echo "$fail UFW not enabled ❌" || echo "$ok UFW OK"
-[[ "$root_login_status" =~ "$fail" ]] && echo "$fail Root login enabled ❌" || echo "$ok Root login disabled"
+echo "✔️  SYSTEM CHECK SUMMARY:"
+[ "$updates" -eq 0 ] && echo "$ok Packages up to date" || echo "$warn Updates available"
+[[ "$docker_msg" == *"Issues:"* ]] && echo "$fail Docker issue" || echo "$ok Docker OK"
+[[ "$crowdsec_status" =~ "$fail" ]] && echo "$fail CrowdSec not working" || echo "$ok CrowdSec OK"
+[[ "$fail2ban_status" =~ "$fail" ]] && echo "$fail Fail2ban not installed" || echo "$ok Fail2ban OK"
+[[ "$ufw_status" =~ "$fail" ]] && echo "$fail UFW not enabled" || echo "$ok UFW OK"
+[[ "$root_login_status" =~ "$fail" ]] && echo "$fail Root login enabled" || echo "$ok Root login disabled"
 echo ""
 EOF
 
