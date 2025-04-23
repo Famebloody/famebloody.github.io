@@ -3,6 +3,19 @@
 DASHBOARD_FILE="/etc/update-motd.d/99-dashboard"
 FORCE_MODE=false
 
+CURRENT_VERSION="2024.04.23"
+REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
+REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
+
+if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "🔔 Доступна новая версия скрипта MOTD: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+    echo "🔗 Обновить можно по ссылке: $REMOTE_URL"
+    echo "💡 Обновление (в одно действие):"
+    echo "   curl -fsSL $REMOTE_URL -o /usr/local/bin/motd-dashboard && chmod +x /usr/local/bin/motd-dashboard && /usr/local/bin/motd-dashboard --force"
+    echo ""
+fi
+
+
 # Обработка аргументов
 for arg in "$@"; do
     case $arg in
@@ -79,11 +92,11 @@ if command -v docker &>/dev/null; then
     docker_running=$(docker ps -q | wc -l)
     docker_stopped=$((docker_total - docker_running))
     docker_msg="$ok ${docker_running} running / ${docker_stopped} stopped"
-    bad_containers=$(docker ps -a --filter "status=exited" --filter "status=restarting" --format '{{.Names}} ({{.Status}})')
+    bad_containers=$(docker ps -a --filter "status=exited" --filter "status=restarting" --format '⛔ {{.Names}} ({{.Status}})')
     if [ -n "$bad_containers" ]; then
-        docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped
-       ⛔ $bad_containers"
+        docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped\n$bad_containers"
     fi
+
 else
     docker_msg="$warn not installed"
 fi
@@ -111,6 +124,22 @@ fi
 updates=$(apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
 update_msg="${updates} package(s) can be updated"
 
+# 🔐 Безопасность: проверка настроек SSH
+ssh_port=$(ss -tuln | grep -Po 'tcp\s+LISTEN.*:\K\d+' | grep -v 22 | head -n1)
+[ -n "$ssh_port" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
+
+permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}')
+[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled"
+
+password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
+[ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
+
+if dpkg -l | grep -q unattended-upgrades; then
+    auto_update_status="$ok enabled"
+else
+    auto_update_status="$warn not installed"
+fi
+
 printf "${bold}🧠 Uptime:        ${normal} %s\n" "$uptime_str"
 printf "${bold}🧮 Load Average:  ${normal} %s\n" "$loadavg"
 printf "${bold}⚙️  CPU Usage:     ${normal} %s\n" "$cpu_usage"
@@ -126,6 +155,10 @@ printf "${bold}🔗 SSH IPs:       ${normal} %s\n" "$ssh_ips"
 printf "${bold}🌐 IP Address:    ${normal} Local: $ip_local | Public: $ip_public\n"
 printf "${bold}🌍 IPv6 Address:   ${normal} $ip6\n"
 printf "${bold}⬆️  Updates:       ${normal} $update_msg\n"
+printf "${bold}🔐 SSH Port:      ${normal} %s\n" "$ssh_port_status"
+printf "${bold}🚫 Root Login:    ${normal} %s\n" "$root_login_status"
+printf "${bold}🔑 Password Auth: ${normal} %s\n" "$password_auth_status"
+printf "${bold}📦 Auto Updates:  ${normal} %s\n" "$auto_update_status"
 echo "$separator"
 echo ""
 echo "${bold}✔️  SYSTEM CHECK SUMMARY:${normal}"
