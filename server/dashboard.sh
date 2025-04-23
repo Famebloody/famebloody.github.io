@@ -3,7 +3,6 @@
 DASHBOARD_FILE="/etc/update-motd.d/99-dashboard"
 FORCE_MODE=false
 
-# Обработка аргументов
 for arg in "$@"; do
     case $arg in
         --force)
