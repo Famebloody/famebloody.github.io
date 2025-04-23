@@ -31,7 +31,7 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
-CURRENT_VERSION="2024.04.23"
+CURRENT_VERSION="2024.04.23_2"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
@@ -123,8 +123,10 @@ updates=$(apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
 update_msg="${updates} package(s) can be updated"
 
 # 🔐 Безопасность: проверка настроек SSH
-ssh_port=$(ss -tuln | grep -Po 'tcp\s+LISTEN.*:\K\d+' | grep -v 22 | head -n1)
-[ -n "$ssh_port" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
+ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
+[ -z "$ssh_port" ] && ssh_port=22  # если не указано — считается 22
+[ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
+
 
 permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}')
 [ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled"
