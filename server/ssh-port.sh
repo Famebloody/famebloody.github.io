@@ -3,8 +3,9 @@
 backup_file() {
     local file=$1
     if [ -f "$file" ]; then
-        cp "$file" "${file}.backup_$(date +%Y%m%d_%H%M%S)"
-        echo -e "\e[32mBackup created: ${file}.backup_$(date +%Y%m%d_%H%M%S)\e[0m"
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        cp "$file" "${file}.backup_$timestamp"
+        echo -e "\e[32mBackup created: ${file}.backup_$timestamp\e[0m"
     fi
 }
 
@@ -16,133 +17,92 @@ check_root() {
 }
 
 detect_os() {
-    os_name=$(lsb_release -is 2>/dev/null || grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '\"')
-    os_version=$(lsb_release -rs 2>/dev/null || grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '\"')
+    os_name=$(lsb_release -is 2>/dev/null || grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+    os_version=$(lsb_release -rs 2>/dev/null || grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
     echo -e "\e[34mDetected system: $os_name $os_version\e[0m"
 }
 
 get_current_port() {
-    grep -Po '(?<=^Port )\d+' "$1" || echo "22"
+    grep -E '^Port[[:space:]]+[0-9]+' "$1" | awk '{print $2}' || echo "22"
 }
 
 change_port_in_config() {
     local config_file=$1
     local port=$2
-    sed -i "s/^#\?Port .*/Port $port/" "$config_file"
+    sed -i -E "s/^#?Port[[:space:]]+[0-9]+/Port $port/" "$config_file"
     echo -e "\e[32mPort was changed in the file: $config_file\e[0m"
     echo -e "\e[32mNew port: $port\e[0m"
 }
 
-reload_ssh_service() {
-    if command -v systemctl > /dev/null; then
+is_port_in_use() {
+    local port=$1
+    ss -tuln | grep -q ":$port "
+}
+
+reload_ssh_services() {
+    local version=$1
+    if [ "$version" = "24.04" ]; then
+        echo -e "\e[34mUsing socket-activated SSH on Ubuntu 24.04\e[0m"
+        systemctl daemon-reexec
         systemctl daemon-reload
-        if ! systemctl restart ssh && ! systemctl restart sshd; then
-            echo -e "\e[31mFailed to restart SSH service.\e[0m"
-            exit 1
-        fi
+        systemctl restart ssh.socket
+        systemctl restart ssh.service
     else
-        if ! service ssh restart && ! service sshd restart; then
-            echo -e "\e[31mFailed to restart SSH service.\e[0m"
-            exit 1
+        if systemctl list-units --type=service | grep -q 'sshd.service'; then
+            systemctl restart sshd.service
+        elif systemctl list-units --type=service | grep -q 'ssh.service'; then
+            systemctl restart ssh.service
         fi
     fi
 }
 
-check_port_availability() {
-    local port=$1
-    if ss -tuln | grep -q ":$port "; then
-        echo -e "\e[31mError: Port $port is already in use by another process.\e[0m"
-        exit 1
-    fi
-}
+# Main execution starts here
+check_root
+detect_os
 
-check_ssh_port() {
-    local port=$1
-    sleep 2
-    if ss -tuln | grep -q ":$port "; then
-        echo -e "\e[32mSSH is successfully running on port $port.\e[0m"
-    else
-        echo -e "\e[31mSSH is NOT running on port $port! Restoring previous configuration.\e[0m"
-        return 1
-    fi
-}
+SSHD_CONFIG="/etc/ssh/sshd_config"
+SOCKET_FILE="/lib/systemd/system/ssh.socket"
 
-prompt_for_port() {
-    read -rp "Enter a new port for SSH (1-65535): " new_port
+os_version=$(lsb_release -rs 2>/dev/null || grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+current_port=$(get_current_port "$SSHD_CONFIG")
+echo -e "\e[34mCurrent SSH port: $current_port\e[0m"
 
+while true; do
+    read -p "Enter a new port for SSH (1-65535): " new_port
+
+    # Validate input
     if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
-        echo -e "\e[31mError: Port must be a number between 1 and 65535.\e[0m"
-        exit 1
+        echo -e "\e[31mInvalid port number. Must be between 1 and 65535.\e[0m"
+        continue
     fi
 
-    check_port_availability "$new_port"
-    echo "$new_port"
-}
-
-check_firewall_rules() {
-    local new_port=$1
-    local old_port=$2
-
-    if command -v ufw > /dev/null; then
-        ufw allow "$new_port"/tcp
-        ufw delete allow "$old_port"/tcp
-        ufw reload
-        echo -e "\e[32mFirewall rules updated (UFW): Port $new_port allowed, Port $old_port removed.\e[0m"
-    elif command -v iptables > /dev/null; then
-        if ! iptables -C INPUT -p tcp --dport "$new_port" -j ACCEPT 2>/dev/null; then
-            iptables -I INPUT -p tcp --dport "$new_port" -j ACCEPT
-            iptables -D INPUT -p tcp --dport "$old_port" -j ACCEPT 2>/dev/null
-            echo -e "\e[32mFirewall rules updated (iptables): Port $new_port allowed, Port $old_port removed.\e[0m"
-        fi
-    else
-        echo -e "\e[31mNo firewall detected. Ensure port $new_port is open manually.\e[0m"
-    fi
-}
-
-change_port() {
-    local config_file="$1"
-    local new_port="$2"
-    local current_port=$(get_current_port "$config_file")
-
-    check_port_availability "$new_port"
-    backup_file "$config_file"
-    change_port_in_config "$config_file" "$new_port"
-
-    reload_ssh_service
-
-    if ! check_ssh_port "$new_port"; then
-        cp "${config_file}.backup"* "$config_file"
-        reload_ssh_service
-        exit 1
+    if [ "$new_port" = "$current_port" ]; then
+        echo -e "\e[33mThe new port is the same as the current SSH port. No changes needed.\e[0m"
+        exit 0
     fi
 
-    echo -e "\e[32mSSH port successfully changed to $new_port.\e[0m"
-    check_firewall_rules "$new_port" "$current_port"
-}
-
-main() {
-    check_root
-    detect_os
-
-
-    local config_file="/etc/ssh/sshd_config"
-    local current_port=$(get_current_port "$config_file")
-    echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
-
-
-    local new_port=$(prompt_for_port)
-
-    if [[ "$os_name" == "Ubuntu" && "$os_version" == "24.04" ]]; then
-        backup_file "/lib/systemd/system/ssh.socket"
-        sed -i "s/^ListenStream=.*/ListenStream=$new_port/" "/lib/systemd/system/ssh.socket"
-        change_port "/etc/ssh/sshd_config" "$new_port"
-    else
-        change_port "/etc/ssh/sshd_config" "$new_port"
+    if is_port_in_use "$new_port"; then
+        echo -e "\e[31mPort $new_port is already in use. Please choose another port.\e[0m"
+        continue
     fi
 
-    echo -e "\e[34m----------------------------------------------------\e[0m"
-    echo -e "\e[32mCreated by DigneZzZ\e[0m"
-    echo -e "\e[36mJoin my community: https://openode.xyz\e[0m"
-}
+    break
+done
 
-main
+backup_file "$SSHD_CONFIG"
+change_port_in_config "$SSHD_CONFIG" "$new_port"
+
+if [ "$os_version" = "24.04" ] && [ -f "$SOCKET_FILE" ]; then
+    backup_file "$SOCKET_FILE"
+    sed -i -E "s/ListenStream=\s*[0-9]+/ListenStream=$new_port/" "$SOCKET_FILE"
+    echo -e "\e[32mUpdated ListenStream in: $SOCKET_FILE\e[0m"
+fi
+
+reload_ssh_services "$os_version"
+status=$?
+
+if [ $status -eq 0 ]; then
+    echo -e "\e[32mSSH service restarted successfully.\e[0m"
+else
+    echo -e "\e[31mFailed to restart SSH service.\e[0m"
+fi
