@@ -10,8 +10,8 @@ REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 
 if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
     echo "🔔 Доступна новая версия скрипта MOTD: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
     echo "🔗 Обновить можно по ссылке: $REMOTE_URL"
-    echo "💡 Обновление (в одно действие):"
-    echo "   curl -fsSL $REMOTE_URL -o /usr/local/bin/motd-dashboard && chmod +x /usr/local/bin/motd-dashboard && /usr/local/bin/motd-dashboard --force"
+    echo "💡 Обновление MOTD (в одно действие):"
+    echo "   curl -fsSL $REMOTE_URL | bash -s -- --force"
     echo ""
 fi
 
