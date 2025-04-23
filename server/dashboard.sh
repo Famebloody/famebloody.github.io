@@ -37,7 +37,7 @@ green=$(tput setaf 2)
 yellow=$(tput setaf 3)
 cyan=$(tput setaf 6)
 
-CURRENT_VERSION="2024.04.23_2"
+CURRENT_VERSION="2024.04.23_3"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
@@ -112,19 +112,21 @@ ssh_ips=$(who | awk '{print $5}' | tr -d '()' | sort | uniq | paste -sd ', ' -)
 if command -v fail2ban-client &>/dev/null; then
     fail2ban_status="$ok active"
 else
-    fail2ban_status="$warn not installed"
+    fail2ban_status="$fail not installed ❌"
 fi
+
 
 if command -v ufw &>/dev/null; then
     ufw_status=$(ufw status | grep -i "Status" | awk '{print $2}')
     if [[ "$ufw_status" == "active" ]]; then
         ufw_status="$ok enabled"
     else
-        ufw_status="$warn disabled"
+        ufw_status="$fail disabled ❌"
     fi
 else
-    ufw_status="$warn not installed"
+    ufw_status="$fail not installed ❌"
 fi
+
 
 updates=$(apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
 update_msg="${updates} package(s) can be updated"
@@ -136,7 +138,7 @@ ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
 
 
 permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}')
-[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled"
+[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled ❌"
 
 password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
 [ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
@@ -172,8 +174,10 @@ echo "${bold}✔️  SYSTEM CHECK SUMMARY:${normal}"
 [ "$updates" -eq 0 ] && echo "$ok Packages up to date" || echo "$warn Updates available"
 [[ "$docker_msg" == *"Issues:"* ]] && echo "$fail Docker issue" || echo "$ok Docker OK"
 [[ "$crowdsec_status" =~ "$fail" ]] && echo "$fail CrowdSec not working" || echo "$ok CrowdSec OK"
-[[ "$fail2ban_status" =~ "$fail" ]] && echo "$fail Fail2ban not installed" || echo "$ok Fail2ban OK"
-[[ "$ufw_status" =~ "$fail" || "$ufw_status" =~ "$warn" ]] && echo "$warn UFW not enabled" || echo "$ok UFW OK"
+[[ "$fail2ban_status" =~ "$fail" ]] && echo "$fail Fail2ban not installed ❌" || echo "$ok Fail2ban OK"
+[[ "$ufw_status" =~ "$fail" ]] && echo "$fail UFW not enabled ❌" || echo "$ok UFW OK"
+[[ "$root_login_status" =~ "$fail" ]] && echo "$fail Root login enabled ❌" || echo "$ok Root login disabled"
+
 echo ""
 printf "${bold}🆕 Dashboard Ver: ${normal} $CURRENT_VERSION\n"
 echo ""
