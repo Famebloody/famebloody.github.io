@@ -120,8 +120,21 @@ ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
 [ -z "$ssh_port" ] && ssh_port=22
 [ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
 
-permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}')
-[ "$permit_root" != "yes" ] && root_login_status="$ok disabled" || root_login_status="$fail enabled"
+permit_root=$(sshd -T 2>/dev/null | grep -i permitrootlogin | awk '{print $2}')
+case "$permit_root" in
+    yes)
+        root_login_status="$fail enabled"
+        ;;
+    no)
+        root_login_status="$ok disabled"
+        ;;
+    without-password|prohibit-password|forced-commands-only)
+        root_login_status="$warn limited ($permit_root)"
+        ;;
+    *)
+        root_login_status="$warn unknown ($permit_root)"
+        ;;
+esac
 
 password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
 [ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
