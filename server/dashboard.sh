@@ -31,14 +31,21 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
+bold=$(tput bold)
+normal=$(tput sgr0)
+green=$(tput setaf 2)
+yellow=$(tput setaf 3)
+cyan=$(tput setaf 6)
+
 CURRENT_VERSION="2024.04.23_2"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
 if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
-    echo "🔔 Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
-    echo "💡 Обновление:"
-    echo "   curl -fsSL $REMOTE_URL | bash -s -- --force"
+echo "${yellow}🔔 Доступна новая версия MOTD-дашборда:${normal} ${green}$REMOTE_VERSION${normal} ${bold}(текущая: $CURRENT_VERSION)${normal}"
+echo "${cyan}💡 Обновление:${normal}"
+echo "   ${bold}curl -fsSL $REMOTE_URL | bash -s -- --force${normal}"
+
     echo ""
 fi
 
