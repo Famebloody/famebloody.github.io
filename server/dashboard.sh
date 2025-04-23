@@ -132,7 +132,7 @@ if dpkg -s unattended-upgrades &>/dev/null && command -v unattended-upgrade &>/d
             if grep -q "Installing" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null; then
                 auto_update_status="$ok working"
             else
-                auto_update_status="$warn enabled, no recent updates"
+                auto_update_status="$ok enabled"
             fi
         else
             auto_update_status="$warn config enabled, timers disabled"
@@ -190,10 +190,6 @@ elif [[ "$auto_update_status" =~ "config disabled" ]]; then
     echo "📌 Auto-Upgrades installed, but config disabled. To fix:"
     echo "   echo 'APT::Periodic::Unattended-Upgrade \"1\";' >> /etc/apt/apt.conf.d/20auto-upgrades"
     echo "   systemctl restart apt-daily.timer apt-daily-upgrade.timer"
-elif [[ "$auto_update_status" =~ "no recent updates" ]]; then
-    echo "📌 Auto-Upgrades seem enabled, but no updates were applied yet."
-    echo "   You can test manually:"
-    echo "   unattended-upgrade -d"
 fi
 
 EOF
