@@ -1,0 +1,26 @@
+name: Update Dashboard Version
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get date-based version
+        run: echo "VERSION=$(date +'%Y.%m.%d')_build$GITHUB_RUN_NUMBER" >> $GITHUB_ENV
+
+      - name: Replace version string in dashboard.sh
+        run: |
+          sed -i -E "s/CURRENT_VERSION=\"[^\"]+\"/CURRENT_VERSION=\"$VERSION\"/" server/dashboard.sh
+
+      - name: Commit and push updated version
+        run: |
+          git config --global user.email "bot@github.com"
+          git config --global user.name "GitHub Bot"
+          git commit -am "🚀 Auto bump version to $VERSION" || echo "No changes to commit"
+          git push
