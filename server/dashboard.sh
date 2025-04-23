@@ -13,7 +13,6 @@ for arg in "$@"; do
     esac
 done
 
-
 # Проверка UTF-8
 if ! locale | grep -qi 'utf-8'; then
     echo "⚠️ Внимание: терминал не использует UTF-8. Возможны искажения вывода."
