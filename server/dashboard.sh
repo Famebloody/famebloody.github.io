@@ -3,19 +3,6 @@
 DASHBOARD_FILE="/etc/update-motd.d/99-dashboard"
 FORCE_MODE=false
 
-CURRENT_VERSION="2024.04.23"
-REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
-REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
-
-if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
-    echo "🔔 Доступна новая версия скрипта MOTD: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
-    echo "🔗 Обновить можно по ссылке: $REMOTE_URL"
-    echo "💡 Обновление MOTD (в одно действие):"
-    echo "   curl -fsSL $REMOTE_URL | bash -s -- --force"
-    echo ""
-fi
-
-
 # Обработка аргументов
 for arg in "$@"; do
     case $arg in
@@ -44,6 +31,17 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
+CURRENT_VERSION="2024.04.23"
+REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
+REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
+
+if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "🔔 Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+    echo "💡 Обновление:"
+    echo "   curl -fsSL $REMOTE_URL | bash -s -- --force"
+    echo ""
+fi
+
 bold=$(tput bold)
 normal=$(tput sgr0)
 blue=$(tput setaf 4)
@@ -167,6 +165,8 @@ echo "${bold}✔️  SYSTEM CHECK SUMMARY:${normal}"
 [[ "$crowdsec_status" =~ "$fail" ]] && echo "$fail CrowdSec not working" || echo "$ok CrowdSec OK"
 [[ "$fail2ban_status" =~ "$fail" ]] && echo "$fail Fail2ban not installed" || echo "$ok Fail2ban OK"
 [[ "$ufw_status" =~ "$fail" || "$ufw_status" =~ "$warn" ]] && echo "$warn UFW not enabled" || echo "$ok UFW OK"
+echo ""
+printf "${bold}🆕 Dashboard Ver: ${normal} $CURRENT_VERSION\n"
 echo ""
 EOF
 
