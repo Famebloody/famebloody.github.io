@@ -177,6 +177,25 @@ echo "✔️  SYSTEM CHECK SUMMARY:"
 [[ "$ufw_status" =~ "$fail" ]] && echo "$fail UFW not enabled" || echo "$ok UFW OK"
 [[ "$root_login_status" =~ "$fail" ]] && echo "$fail Root login enabled" || echo "$ok Root login disabled"
 echo ""
+
+echo ""
+if [[ "$auto_update_status" =~ "$fail" ]]; then
+    echo "📌 Auto-Upgrades not installed. To install and enable:"
+    echo "   apt install unattended-upgrades -y"
+    echo "   dpkg-reconfigure --priority=low unattended-upgrades"
+elif [[ "$auto_update_status" =~ "timers disabled" ]]; then
+    echo "📌 Auto-Upgrades config enabled, but timers are off. To enable:"
+    echo "   systemctl enable --now apt-daily.timer apt-daily-upgrade.timer"
+elif [[ "$auto_update_status" =~ "config disabled" ]]; then
+    echo "📌 Auto-Upgrades installed, but config disabled. To fix:"
+    echo "   echo 'APT::Periodic::Unattended-Upgrade \"1\";' >> /etc/apt/apt.conf.d/20auto-upgrades"
+    echo "   systemctl restart apt-daily.timer apt-daily-upgrade.timer"
+elif [[ "$auto_update_status" =~ "no recent updates" ]]; then
+    echo "📌 Auto-Upgrades seem enabled, but no updates were applied yet."
+    echo "   You can test manually:"
+    echo "   unattended-upgrade -d"
+fi
+
 EOF
 
 # Предпросмотр
