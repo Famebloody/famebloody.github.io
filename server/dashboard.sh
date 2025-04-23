@@ -31,7 +31,7 @@ TMP_FILE=$(mktemp)
 # Создание MOTD скрипта
 /bin/cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
-CURRENT_VERSION="2024.04.23_6"
+CURRENT_VERSION="2024.04.23_7"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
@@ -84,8 +84,10 @@ if command -v docker &>/dev/null; then
     docker_msg="$ok ${docker_running} running / ${docker_stopped} stopped"
     bad_containers=$(docker ps -a --filter "status=exited" --filter "status=restarting" --format '⛔ {{.Names}} ({{.Status}})')
     if [ -n "$bad_containers" ]; then
-        docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped\n$bad_containers"
+        docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped"
+        docker_msg_extra="$bad_containers"
     fi
+
 else
     docker_msg="$warn not installed"
 fi
@@ -137,7 +139,8 @@ echo "💾 RAM Usage:     $mem_data"
 echo "💽 Disk Usage:    $disk_status"
 echo "📡 Net Traffic:   $traffic"
 echo "🔐 CrowdSec:      $crowdsec_status"
-echo "🐳 Docker:        $docker_msg"
+echo -e "🐳 Docker:        $docker_msg"
+[ -n "$docker_msg_extra" ] && echo -e "$docker_msg_extra"
 echo "👮 Fail2ban:      $fail2ban_status"
 echo "🧱 UFW Firewall:  $ufw_status"
 echo "👥 SSH Sessions:  $ssh_users"
