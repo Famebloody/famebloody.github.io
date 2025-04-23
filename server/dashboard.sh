@@ -126,15 +126,19 @@ permit_root=$(grep -Ei '^PermitRootLogin' /etc/ssh/sshd_config | awk '{print $2}
 password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
 [ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
 
-if dpkg -l | grep -q unattended-upgrades; then
+if dpkg -s unattended-upgrades &>/dev/null && command -v unattended-upgrade &>/dev/null; then
     if grep -q 'Unattended-Upgrade "1";' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null; then
         if systemctl is-enabled apt-daily.timer &>/dev/null && systemctl is-enabled apt-daily-upgrade.timer &>/dev/null; then
-            auto_update_status="$ok enabled"
+            if grep -q "Installing" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null; then
+                auto_update_status="$ok working"
+            else
+                auto_update_status="$warn enabled, no recent updates"
+            fi
         else
-            auto_update_status="$warn config enabled, but timers are disabled"
+            auto_update_status="$warn config enabled, timers disabled"
         fi
     else
-        auto_update_status="$warn installed, but disabled in config"
+        auto_update_status="$warn installed, config disabled"
     fi
 else
     auto_update_status="$fail not installed"
