@@ -85,8 +85,9 @@ if command -v docker &>/dev/null; then
     bad_containers=$(docker ps -a --filter "status=exited" --filter "status=restarting" --format '⛔ {{.Names}} ({{.Status}})')
     if [ -n "$bad_containers" ]; then
         docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped"
-        docker_msg_extra="$bad_containers"
+        docker_msg_extra=$(echo "$bad_containers" | sed 's/^/                    /')
     fi
+
 
 else
     docker_msg="$warn not installed"
