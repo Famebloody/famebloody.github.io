@@ -18,7 +18,6 @@ for arg in "$@"; do
             INSTALL_USER_MODE=true
             ;;
     esac
-    shift
 done
 
 # === Функция: Установка CLI утилиты motd-config ===
@@ -100,6 +99,24 @@ if [ "$EUID" -ne 0 ] && [ "$INSTALL_USER_MODE" = false ]; then
     exit 1
 fi
 TMP_FILE=$(mktemp)
+
+# === Проверка зависимостей, если не root ===
+if [ "$EUID" -ne 0 ]; then
+    MISSING=()
+    for CMD in curl hostname awk grep cut uname df free top ip uptime vnstat; do
+        if ! command -v "$CMD" &>/dev/null; then
+            MISSING+=("$CMD")
+        fi
+    done
+    if (( ${#MISSING[@]} )); then
+        echo "❌ Не хватает обязательных утилит: ${MISSING[*]}"
+        echo "🛠 Пожалуйста, установи их командой (под root):"
+        echo "    sudo apt install curl coreutils net-tools procps iproute2 vnstat -y"
+        echo "🔁 После этого снова запусти установку."
+        exit 1
+    fi
+fi
+
 # === Создание dashboard-файла ===
 mkdir -p /etc/update-motd.d
 cat > "$TMP_FILE" << 'EOF'
