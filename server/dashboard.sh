@@ -32,7 +32,7 @@ mkdir -p /etc/update-motd.d
 cat > "$DASHBOARD_FILE" << 'EOF'
 #!/bin/bash
 
-CURRENT_VERSION="2025.04.24_build14"
+CURRENT_VERSION="2025.04.24_build15"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 
 ok="✅"
@@ -227,7 +227,7 @@ print_section kernel
 
 # === Проверка версии дашборда ===
 if curl -fsSL "$REMOTE_URL" >/dev/null; then
-    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="' | sed -n 's/^.*CURRENT_VERSION=\"\([^"]*\)\".*/\1/p')
+    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="2025.04.24_build15"\([^"]*\)\".*/\1/p')
     if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
         echo "📣 Доступна новая версия дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
         echo "🔄 Обновить: curl -fsSL $REMOTE_URL | bash -s -- --force"
