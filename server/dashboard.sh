@@ -134,7 +134,7 @@ cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
 
 
-CURRENT_VERSION="2025.04.24_build22"
+CURRENT_VERSION="2025.04.24_build23"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
