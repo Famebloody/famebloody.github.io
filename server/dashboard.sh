@@ -234,15 +234,7 @@ print_section kernel
 [ "$SHOW_UPDATES" = true ] && print_section updates
 [ "$SHOW_AUTOUPDATES" = true ] && print_section autoupdates
 
-# === Проверка версии дашборда ===
-if curl -fsSL "$REMOTE_URL" >/dev/null; then
-    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="2025.04.24_build16"\([^"]*\)\".*/\1/p')
-    if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
-        echo "📣 Доступна новая версия дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
-        echo "🔄 Обновить: curl -fsSL $REMOTE_URL | bash -s -- --force"
-    fi
-fi
-
+echo ""
 printf " %-20s : %s\n" "Dashboard Ver" "$CURRENT_VERSION"
 echo "$separator"
 printf " %-20s : %s\n" "Config tool" "motd-config"
