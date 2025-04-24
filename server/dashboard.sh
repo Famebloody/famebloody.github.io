@@ -179,6 +179,7 @@ print_section() {
       echo "🔑 Password Auth: $password_auth_status"
       echo "👥 SSH Sessions:  $ssh_users"
       echo "🔗 SSH IPs:       $ssh_ips"
+      echo "↑↑↑ Secure status block ↑↑↑"
       ;;
     updates) echo "⬆️ Updates:       $update_msg" ;;
     autoupdates)
