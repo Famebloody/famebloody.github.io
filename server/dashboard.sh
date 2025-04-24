@@ -239,3 +239,10 @@ printf " %-20s : %s\n" "Dashboard Ver" "$CURRENT_VERSION"
 echo "$separator"
 printf " %-20s : %s\n" "Config tool" "motd-config"
 EOF
+
+echo "✅ Установлен дашборд: $DASHBOARD_FILE"
+echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
+echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
+echo ""
+echo "👉 Для настройки отображения блоков — выполни: motd-config"
+echo "👉 Обновлённый MOTD появится при следующем входе"
