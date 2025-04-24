@@ -20,13 +20,22 @@ for arg in "$@"; do
     esac
 done
 
+
+if [ "$INSTALL_USER_MODE" = true ]; then
+    DASHBOARD_FILE="$HOME/.config/neonode/99-dashboard"
+    MOTD_CONFIG_TOOL="$HOME/.local/bin/motd-config"
+    CONFIG_GLOBAL="$HOME/.motdrc"
+    mkdir -p "$(dirname "$DASHBOARD_FILE")" "$(dirname "$MOTD_CONFIG_TOOL")"
+fi
+
+
 # === Функция: Установка CLI утилиты motd-config ===
 install_motd_config() {
     echo "📥 Установка CLI утилиты motd-config в $MOTD_CONFIG_TOOL"
     cat > "$MOTD_CONFIG_TOOL" << 'EOF'
 #!/bin/bash
 
-CONFIG_GLOBAL="/etc/motdrc"
+CONFIG_GLOBAL="$CONFIG_GLOBAL"
 CONFIG_USER="$HOME/.motdrc"
 TARGET_FILE="$CONFIG_GLOBAL"
 
@@ -118,7 +127,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # === Создание dashboard-файла ===
-mkdir -p /etc/update-motd.d
+if [ "$INSTALL_USER_MODE" = false ]; then
+    mkdir -p /etc/update-motd.d
+fi
 cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
 
@@ -139,7 +150,7 @@ fail="❌"
 warn="⚠️"
 separator="─~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-CONFIG_GLOBAL="/etc/motdrc"
+CONFIG_GLOBAL="$CONFIG_GLOBAL"
 CONFIG_USER="$HOME/.motdrc"
 [ -f "$CONFIG_GLOBAL" ] && source "$CONFIG_GLOBAL"
 [ -f "$CONFIG_USER" ] && source "$CONFIG_USER"
@@ -339,7 +350,9 @@ echo "===================================================="
 if [ "$FORCE_MODE" = true ]; then
     echo "⚙️ Автоматическая установка без подтверждения (--force)"
     mv "$TMP_FILE" "$DASHBOARD_FILE"
+if [ "$INSTALL_USER_MODE" = false ]; then
     chmod +x "$DASHBOARD_FILE"
+fi
     install_motd_config
     create_motd_global_config
     echo "✅ Установлен дашборд: $DASHBOARD_FILE"
@@ -358,8 +371,12 @@ else
     read -p '❓ Установить этот MOTD-дэшборд? [y/N]: ' confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         mv "$TMP_FILE" "$DASHBOARD_FILE"
-        chmod +x "$DASHBOARD_FILE"
-        find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \;
+if [ "$INSTALL_USER_MODE" = false ]; then
+    chmod +x "$DASHBOARD_FILE"
+fi
+        if [ "$INSTALL_USER_MODE" = false ]; then
+            find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \;
+        fi
     install_motd_config
     create_motd_global_config
     
