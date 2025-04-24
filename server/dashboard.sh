@@ -21,6 +21,79 @@ for arg in "$@"; do
     shift
 done
 
+# === Функция: Установка CLI утилиты motd-config ===
+install_motd_config() {
+    echo "📥 Установка CLI утилиты motd-config в $MOTD_CONFIG_TOOL"
+    cat > "$MOTD_CONFIG_TOOL" << 'EOF'
+#!/bin/bash
+
+CONFIG_GLOBAL="/etc/motdrc"
+CONFIG_USER="$HOME/.motdrc"
+TARGET_FILE="$CONFIG_GLOBAL"
+
+if [ ! -w "$CONFIG_GLOBAL" ]; then
+  echo "⚠️ Нет прав на $CONFIG_GLOBAL, используем $CONFIG_USER"
+  TARGET_FILE="$CONFIG_USER"
+fi
+
+declare -a OPTIONS=(
+  SHOW_UPTIME
+  SHOW_LOAD
+  SHOW_CPU
+  SHOW_RAM
+  SHOW_DISK
+  SHOW_NET
+  SHOW_IP
+  SHOW_DOCKER
+  SHOW_SSH
+  SHOW_SECURITY
+  SHOW_UPDATES
+  SHOW_AUTOUPDATES
+)
+
+echo "🔧 Настройка NeoNode MOTD"
+echo "Выбери блоки для отображения (y/n):"
+
+for VAR in "${OPTIONS[@]}"; do
+  DEFAULT="true"
+  read -p "$VAR (y/n) [Y]: " val
+  case "${val,,}" in
+    y|"") echo "$VAR=true" ;;
+    n)    echo "$VAR=false" ;;
+    *)    echo "$VAR=$DEFAULT" ;;
+  esac
+done > "$TARGET_FILE"
+
+echo "✅ Настройки сохранены в $TARGET_FILE"
+EOF
+
+    chmod +x "$MOTD_CONFIG_TOOL"
+    echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
+}
+
+# === Функция: Создание глобального конфига ===
+create_motd_global_config() {
+    if [ ! -f "$CONFIG_GLOBAL" ]; then
+        cat > "$CONFIG_GLOBAL" << EOF
+SHOW_UPTIME=true
+SHOW_LOAD=true
+SHOW_CPU=true
+SHOW_RAM=true
+SHOW_DISK=true
+SHOW_NET=true
+SHOW_IP=true
+SHOW_DOCKER=true
+SHOW_SSH=true
+SHOW_SECURITY=true
+SHOW_UPDATES=true
+SHOW_AUTOUPDATES=true
+EOF
+        echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
+    else
+        echo "ℹ️ Глобальный конфиг уже существует: $CONFIG_GLOBAL"
+    fi
+}
+
 # === Проверка прав ===
 if [ "$EUID" -ne 0 ] && [ "$INSTALL_USER_MODE" = false ]; then
     echo "❌ Пожалуйста, запусти от root или с флагом --not-root"
@@ -250,7 +323,8 @@ if [ "$FORCE_MODE" = true ]; then
     echo "⚙️ Автоматическая установка без подтверждения (--force)"
     mv "$TMP_FILE" "$DASHBOARD_FILE"
     chmod +x "$DASHBOARD_FILE"
-
+    install_motd_config
+    create_motd_global_config
     echo "✅ Установлен дашборд: $DASHBOARD_FILE"
     echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
     echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
@@ -269,7 +343,9 @@ else
         mv "$TMP_FILE" "$DASHBOARD_FILE"
         chmod +x "$DASHBOARD_FILE"
         find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \;
-
+    install_motd_config
+    create_motd_global_config
+    
     echo "✅ Установлен дашборд: $DASHBOARD_FILE"
     echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
     echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
