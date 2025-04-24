@@ -33,7 +33,7 @@ cat > "$DASHBOARD_FILE" << 'EOF'
 #!/bin/bash
 
 
-CURRENT_VERSION="2025.04.24_build9"
+CURRENT_VERSION="2025.04.24_build16"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
@@ -236,7 +236,7 @@ print_section kernel
 
 # === Проверка версии дашборда ===
 if curl -fsSL "$REMOTE_URL" >/dev/null; then
-    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="2025.04.24_build15"\([^"]*\)\".*/\1/p')
+    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="2025.04.24_build16"\([^"]*\)\".*/\1/p')
     if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
         echo "📣 Доступна новая версия дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
         echo "🔄 Обновить: curl -fsSL $REMOTE_URL | bash -s -- --force"
