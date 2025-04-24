@@ -34,12 +34,11 @@ cat > "$DASHBOARD_FILE" << 'EOF'
 
 CURRENT_VERSION="2025.04.24_build14"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
-REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
 ok="✅"
 fail="❌"
 warn="⚠️"
-separator="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+separator="─~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 CONFIG_GLOBAL="/etc/motdrc"
 CONFIG_USER="$HOME/.motdrc"
@@ -155,35 +154,30 @@ else
     auto_update_status="$fail not installed"
 fi
 
+print_row() {
+    local label="$1"
+    local value="$2"
+    printf " %-20s : %s\n" "$label" "$value"
+}
+
 print_section() {
   case "$1" in
-    uptime) printf "🧠 %-14s %s\n" "Uptime:" "$uptime_str" ;;
-    load) printf "🧮 %-14s %s\n" "Load Average:" "$loadavg" ;;
-    cpu) printf "⚙️ %-14s %s\n" "CPU Usage:" "$cpu_usage" ;;
-    kernel) printf "🧬 %-14s %s\n" "Kernel:" "$(uname -r)" ;;
-    ram) printf "💾 %-14s %s\n" "RAM Usage:" "$mem_data" ;;
-    disk) printf "💽 %-14s %s\n" "Disk Usage:" "$disk_status" ;;
-    net) printf "📡 %-14s %s\n" "Net Traffic:" "$traffic" ;;
-    ip) printf "🌐 %-14s %s\n" "IP Address:" "Local: $ip_local | Public: $ip_public | IPv6: $ip6" ;;
+    uptime)       print_row "System Uptime" "$uptime_str" ;;
+    load)         print_row "Load Average" "$loadavg" ;;
+    cpu)          print_row "CPU Usage" "$cpu_usage" ;;
+    kernel)       print_row "Kernel" "$(uname -r)" ;;
+    ram)          print_row "RAM Usage" "$mem_data" ;;
+    disk)         print_row "Disk Usage" "$disk_status" ;;
+    net)          print_row "Net Traffic" "$traffic" ;;
+    ip)           print_row "IPv4/IPv6" "Local: $ip_local / Public: $ip_public / IPv6: $ip6" ;;
     docker)
-      printf "🐳 %-14s %s\n" "Docker:" "$docker_msg"
+      print_row "Docker" "$docker_msg"
       [ -n "$docker_msg_extra" ] && echo -e "$docker_msg_extra"
       ;;
-    ssh_block)
-      echo "↓↓↓ Secure status block ↓↓↓"
-      echo "👮 Fail2ban:      $fail2ban_status"
-      echo "🔐 CrowdSec:      $crowdsec_status"
-      echo "🧱 UFW Firewall:  $ufw_status"
-      echo "🔐 SSH Port:      $ssh_port_status"
-      echo "🚫 Root Login:    $root_login_status"
-      echo "🔑 Password Auth: $password_auth_status"
-      echo "👥 SSH Sessions:  $ssh_users"
-      echo "🔗 SSH IPs:       $ssh_ips"
-      echo "↑↑↑ Secure status block ↑↑↑"
-      ;;
-    updates) printf "⬆️  %-14s %s\n" "Updates:" "$update_msg" ;;
-    autoupdates) printf "📦 %-14s %s\n" "Auto Updates:" "$auto_update_status" ;;
-        case "$auto_update_status" in
+    updates)      print_row "Apt Updates" "$update_msg" ;;
+    autoupdates)
+      print_row "Auto Updates" "$auto_update_status"
+      case "$auto_update_status" in
         *"$fail"*)
           echo "📌 Auto-Upgrades not installed. To install and enable:"
           echo "   apt install unattended-upgrades -y"
@@ -200,10 +194,23 @@ print_section() {
           ;;
       esac
       ;;
+    ssh_block)
+      echo " ↓↓↓ Security Block ↓↓↓"
+      print_row "Fail2ban" "$fail2ban_status"
+      print_row "CrowdSec" "$crowdsec_status"
+      print_row "UFW Firewall" "$ufw_status"
+      print_row "SSH Port" "$ssh_port_status"
+      print_row "Root Login" "$root_login_status"
+      print_row "Password Auth" "$password_auth_status"
+      print_row "SSH Sessions" "$ssh_users"
+      print_row "SSH IPs" "$ssh_ips"
+      echo " ↑↑↑ Security Block ↑↑↑"
+      ;;
   esac
 }
 
-echo "  — powered by https://NeoNode.cc"
+echo "$separator"
+echo " MOTD Dashboard — powered by https://NeoNode.cc"
 echo "$separator"
 [ "$SHOW_UPTIME" = true ] && print_section uptime
 [ "$SHOW_LOAD" = true ] && print_section load
@@ -220,96 +227,14 @@ print_section kernel
 
 # === Проверка версии дашборда ===
 if curl -fsSL "$REMOTE_URL" >/dev/null; then
-    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="2025.04.24_build14"\([^"]*\)".*/\1/p')
+    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="' | sed -n 's/^.*CURRENT_VERSION=\"\([^"]*\)\".*/\1/p')
     if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
         echo "📣 Доступна новая версия дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
         echo "🔄 Обновить: curl -fsSL $REMOTE_URL | bash -s -- --force"
     fi
 fi
 
-echo "🆕 Dashboard Ver: $CURRENT_VERSION"
+printf " %-20s : %s\n" "Dashboard Ver" "$CURRENT_VERSION"
 echo "$separator"
-echo "⚙️ Настройка отображения: motd-config"
+printf " %-20s : %s\n" "Config tool" "motd-config"
 EOF
-
-chmod +x "$DASHBOARD_FILE"
-# === Установка CLI-утилиты motd-config ===
-cat > "$MOTD_CONFIG_TOOL" << 'EOF'
-#!/bin/bash
-
-CONFIG_FILE="$HOME/.motdrc"
-USE_GLOBAL=false
-
-for arg in "$@"; do
-    if [ "$arg" == "--not-root" ]; then
-        CONFIG_FILE="$HOME/.motdrc"
-        USE_GLOBAL=false
-    fi
-done
-
-if [ "$EUID" -eq 0 ] && [ "$USE_GLOBAL" = false ]; then
-    read -p "🔧 Настроить глобально для всех пользователей (/etc/motdrc)? [y/N]: " global_choice
-    if [[ "$global_choice" =~ ^[Yy]$ ]]; then
-        CONFIG_FILE="/etc/motdrc"
-        USE_GLOBAL=true
-    fi
-fi
-
-declare -A BLOCKS=(
-    [SHOW_UPTIME]="Uptime"
-    [SHOW_LOAD]="Load Average"
-    [SHOW_CPU]="CPU Usage"
-    [SHOW_RAM]="RAM Usage"
-    [SHOW_DISK]="Disk Usage"
-    [SHOW_NET]="Network Traffic"
-    [SHOW_IP]="IP Address"
-    [SHOW_DOCKER]="Docker"
-    [SHOW_SSH]="SSH Info"
-    [SHOW_SECURITY]="Security (CrowdSec, UFW, Fail2ban)"
-    [SHOW_UPDATES]="Apt Updates"
-    [SHOW_AUTOUPDATES]="Auto Updates"
-)
-
-echo "🛠️ Конфигуратор MOTD"
-echo "Файл: $CONFIG_FILE"
-echo ""
-
-> "$CONFIG_FILE"
-
-for key in "${!BLOCKS[@]}"; do
-    read -p "❓ Показывать ${BLOCKS[$key]}? [Y/n]: " answer
-    case "$answer" in
-        [Nn]*) echo "$key=false" >> "$CONFIG_FILE" ;;
-        *)     echo "$key=true" >> "$CONFIG_FILE" ;;
-    esac
-done
-
-echo ""
-echo "✅ Конфигурация сохранена в $CONFIG_FILE"
-EOF
-
-chmod +x "$MOTD_CONFIG_TOOL"
-
-# === Дефолтный глобальный конфиг ===
-cat > "$CONFIG_GLOBAL" << EOF
-SHOW_UPTIME=true
-SHOW_LOAD=true
-SHOW_CPU=true
-SHOW_RAM=true
-SHOW_DISK=true
-SHOW_NET=true
-SHOW_IP=true
-SHOW_DOCKER=true
-SHOW_SSH=true
-SHOW_SECURITY=true
-SHOW_UPDATES=true
-SHOW_AUTOUPDATES=true
-EOF
-
-echo "✅ Установлен дашборд: $DASHBOARD_FILE"
-echo "✅ Установлена CLI утилита: motd-config"
-echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
-echo ""
-echo "👉 Для настройки блоков — запусти: motd-config"
-echo "👉 MOTD появится при следующем входе"
-
