@@ -224,5 +224,83 @@ echo "⚙️ Настройка отображения: motd-config"
 EOF
 
 chmod +x "$DASHBOARD_FILE"
+# === Установка CLI-утилиты motd-config ===
+cat > "$MOTD_CONFIG_TOOL" << 'EOF'
+#!/bin/bash
 
-echo "✅ MOTD-дашборд установлен, CLI настроен, глобальный конфиг создан."
+CONFIG_FILE="$HOME/.motdrc"
+USE_GLOBAL=false
+
+for arg in "$@"; do
+    if [ "$arg" == "--not-root" ]; then
+        CONFIG_FILE="$HOME/.motdrc"
+        USE_GLOBAL=false
+    fi
+done
+
+if [ "$EUID" -eq 0 ] && [ "$USE_GLOBAL" = false ]; then
+    read -p "🔧 Настроить глобально для всех пользователей (/etc/motdrc)? [y/N]: " global_choice
+    if [[ "$global_choice" =~ ^[Yy]$ ]]; then
+        CONFIG_FILE="/etc/motdrc"
+        USE_GLOBAL=true
+    fi
+fi
+
+declare -A BLOCKS=(
+    [SHOW_UPTIME]="Uptime"
+    [SHOW_LOAD]="Load Average"
+    [SHOW_CPU]="CPU Usage"
+    [SHOW_RAM]="RAM Usage"
+    [SHOW_DISK]="Disk Usage"
+    [SHOW_NET]="Network Traffic"
+    [SHOW_IP]="IP Address"
+    [SHOW_DOCKER]="Docker"
+    [SHOW_SSH]="SSH Info"
+    [SHOW_SECURITY]="Security (CrowdSec, UFW, Fail2ban)"
+    [SHOW_UPDATES]="Apt Updates"
+    [SHOW_AUTOUPDATES]="Auto Updates"
+)
+
+echo "🛠️ Конфигуратор MOTD"
+echo "Файл: $CONFIG_FILE"
+echo ""
+
+> "$CONFIG_FILE"
+
+for key in "${!BLOCKS[@]}"; do
+    read -p "❓ Показывать ${BLOCKS[$key]}? [Y/n]: " answer
+    case "$answer" in
+        [Nn]*) echo "$key=false" >> "$CONFIG_FILE" ;;
+        *)     echo "$key=true" >> "$CONFIG_FILE" ;;
+    esac
+done
+
+echo ""
+echo "✅ Конфигурация сохранена в $CONFIG_FILE"
+EOF
+
+chmod +x "$MOTD_CONFIG_TOOL"
+
+# === Дефолтный глобальный конфиг ===
+cat > "$CONFIG_GLOBAL" << EOF
+SHOW_UPTIME=true
+SHOW_LOAD=true
+SHOW_CPU=true
+SHOW_RAM=true
+SHOW_DISK=true
+SHOW_NET=true
+SHOW_IP=true
+SHOW_DOCKER=true
+SHOW_SSH=true
+SHOW_SECURITY=true
+SHOW_UPDATES=true
+SHOW_AUTOUPDATES=true
+EOF
+
+echo "✅ Установлен дашборд: $DASHBOARD_FILE"
+echo "✅ Установлена CLI утилита: motd-config"
+echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
+echo ""
+echo "👉 Для настройки блоков — запусти: motd-config"
+echo "👉 MOTD появится при следующем входе"
+
