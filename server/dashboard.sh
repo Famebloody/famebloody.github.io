@@ -39,7 +39,7 @@ REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 
 
 if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
     echo "${warn} Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
-    echo "💡 Обновление: curl -fsSL $REMOTE_URL | bash -s -- --force"
+    echo "💡 Обновление: bash <(wget -qO- $REMOTE_URL) --force"
     echo ""
 fi
 
