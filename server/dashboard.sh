@@ -157,16 +157,16 @@ fi
 
 print_section() {
   case "$1" in
-    uptime) echo "🧠 Uptime:        $uptime_str" ;;
-    load) echo "🧮 Load Average:  $loadavg" ;;
-    cpu) echo "⚙️ CPU Usage:     $cpu_usage" ;;
-    kernel) echo "🧬 Kernel:         $(uname -r)" ;;
-    ram) echo "💾 RAM Usage:     $mem_data" ;;
-    disk) echo "💽 Disk Usage:    $disk_status" ;;
-    net) echo "📡 Net Traffic:   $traffic" ;;
-    ip) echo "🌐 IP Address:    Local: $ip_local | Public: $ip_public | IPv6: $ip6" ;;
+    uptime) printf "🧠 %-14s %s\n" "Uptime:" "$uptime_str" ;;
+    load) printf "🧮 %-14s %s\n" "Load Average:" "$loadavg" ;;
+    cpu) printf "⚙️ %-14s %s\n" "CPU Usage:" "$cpu_usage" ;;
+    kernel) printf "🧬 %-14s %s\n" "Kernel:" "$(uname -r)" ;;
+    ram) printf "💾 %-14s %s\n" "RAM Usage:" "$mem_data" ;;
+    disk) printf "💽 %-14s %s\n" "Disk Usage:" "$disk_status" ;;
+    net) printf "📡 %-14s %s\n" "Net Traffic:" "$traffic" ;;
+    ip) printf "🌐 %-14s %s\n" "IP Address:" "Local: $ip_local | Public: $ip_public | IPv6: $ip6" ;;
     docker)
-      echo -e "🐳 Docker:        $docker_msg"
+      printf "🐳 %-14s %s\n" "Docker:" "$docker_msg"
       [ -n "$docker_msg_extra" ] && echo -e "$docker_msg_extra"
       ;;
     ssh_block)
@@ -181,10 +181,9 @@ print_section() {
       echo "🔗 SSH IPs:       $ssh_ips"
       echo "↑↑↑ Secure status block ↑↑↑"
       ;;
-    updates) echo "⬆️ Updates:       $update_msg" ;;
-    autoupdates)
-      echo "📦 Auto Updates:  $auto_update_status"
-      case "$auto_update_status" in
+    updates) printf "⬆️  %-14s %s\n" "Updates:" "$update_msg" ;;
+    autoupdates) printf "📦 %-14s %s\n" "Auto Updates:" "$auto_update_status" ;;
+        case "$auto_update_status" in
         *"$fail"*)
           echo "📌 Auto-Upgrades not installed. To install and enable:"
           echo "   apt install unattended-upgrades -y"
@@ -218,6 +217,15 @@ print_section kernel
 [ "$SHOW_SECURITY" = true ] && print_section ssh_block
 [ "$SHOW_UPDATES" = true ] && print_section updates
 [ "$SHOW_AUTOUPDATES" = true ] && print_section autoupdates
+
+# === Проверка версии дашборда ===
+if curl -fsSL "$REMOTE_URL" >/dev/null; then
+    REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep 'CURRENT_VERSION="' | sed -n 's/^.*CURRENT_VERSION="\([^"]*\)".*/\1/p')
+    if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
+        echo "📣 Доступна новая версия дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+        echo "🔄 Обновить: curl -fsSL $REMOTE_URL | bash -s -- --force"
+    fi
+fi
 
 echo "🆕 Dashboard Ver: $CURRENT_VERSION"
 echo "$separator"
