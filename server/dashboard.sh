@@ -32,8 +32,17 @@ mkdir -p /etc/update-motd.d
 cat > "$DASHBOARD_FILE" << 'EOF'
 #!/bin/bash
 
-CURRENT_VERSION="2025.04.24_build15"
+
+CURRENT_VERSION="2025.04.24_build9"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
+REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
+
+if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "${warn} Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+    echo "💡 Обновление: curl -fsSL $REMOTE_URL | bash -s -- --force"
+    echo ""
+fi
+
 
 ok="✅"
 fail="❌"
@@ -195,7 +204,7 @@ print_section() {
       esac
       ;;
     ssh_block)
-      echo " ↓↓↓ Security Block ↓↓↓"
+      echo " ~~~~~~ ↓↓↓ Security Block ↓↓↓ ~~~~~~"
       print_row "Fail2ban" "$fail2ban_status"
       print_row "CrowdSec" "$crowdsec_status"
       print_row "UFW Firewall" "$ufw_status"
@@ -204,7 +213,7 @@ print_section() {
       print_row "Password Auth" "$password_auth_status"
       print_row "SSH Sessions" "$ssh_users"
       print_row "SSH IPs" "$ssh_ips"
-      echo " ↑↑↑ Security Block ↑↑↑"
+      echo " ~~~~~~ ↑↑↑ Security Block ↑↑↑ ~~~~~~"
       ;;
   esac
 }
