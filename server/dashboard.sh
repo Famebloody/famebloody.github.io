@@ -32,7 +32,7 @@ mkdir -p /etc/update-motd.d
 cat > "$DASHBOARD_FILE" << 'EOF'
 #!/bin/bash
 
-CURRENT_VERSION="2025.04.23_build_motd_config"
+CURRENT_VERSION="2025.04.24_build11"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
