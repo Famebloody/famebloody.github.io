@@ -57,7 +57,7 @@ function check_and_install_command() {
 }
 
 detect_package_manager
-NEEDED_CMDS=(openssl curl dig whois ping)
+NEEDED_CMDS=(openssl curl dig whois ping bc)
 for cmd in "${NEEDED_CMDS[@]}"; do
   check_and_install_command "$cmd"
 done
