@@ -18,9 +18,19 @@ jobs:
         run: |
           sed -i -E "s/CURRENT_VERSION=\"[^\"]+\"/CURRENT_VERSION=\"$VERSION\"/" server/dashboard.sh
 
+      - name: Check if dashboard.sh changed
+        id: check_changes
+        run: |
+          if git diff --quiet server/dashboard.sh; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Commit and push updated version
+        if: steps.check_changes.outputs.changed == 'true'
         run: |
           git config --global user.email "bot@github.com"
           git config --global user.name "GitHub Bot"
-          git commit -am "🚀 Auto bump version to $VERSION" || echo "No changes to commit"
+          git commit -am "🚀 Auto bump version to $VERSION"
           git push
