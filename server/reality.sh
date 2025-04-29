@@ -123,26 +123,20 @@ fi
 # --- 3) TLS
 TLS_P=()
 TLS_N=()
+
 if [ -n "$main_ip" ]; then
   tls_out=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_3 2>&1)
-  tls13="No"
-  if echo "$tls_out" | grep -q "Protocol  : TLSv1.3"; then
-    tls13="Yes"
-    TLS_P+=("TLS 1.3: Yes")
 
+  if echo "$tls_out" | grep -qE "New, TLSv1\.3|Protocol  *: TLSv1\.3"; then
+    TLS_P+=("TLS 1.3: Yes")
     if echo "$tls_out" | grep -q "Server Temp Key: X25519"; then
       TLS_P+=("X25519: Yes")
     else
-      x2=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_3 -curves X25519 2>&1)
-      if echo "$x2" | grep -q "Protocol  : TLSv1.3"; then
-        TLS_P+=("X25519: Yes")
-      else
-        TLS_N+=("X25519: No")
-      fi
+      TLS_N+=("X25519: No")
     fi
   else
     tls12_out=$(echo | timeout 5 openssl s_client -connect "$main_ip:$PORT" -servername "$DOMAIN" -tls1_2 2>&1)
-    if echo "$tls12_out" | grep -q "Protocol  : TLSv1.2"; then
+    if echo "$tls12_out" | grep -qE "New, TLSv1\.2|Protocol  *: TLSv1\.2"; then
       TLS_P+=("TLS 1.2: Yes")
       TLS_N+=("TLS 1.3: No")
     else
@@ -153,6 +147,7 @@ if [ -n "$main_ip" ]; then
 else
   TLS_N+=("TLS: нет IP => не проверено")
 fi
+
 
 # --- 4) HTTP
 HTTP_P=()
