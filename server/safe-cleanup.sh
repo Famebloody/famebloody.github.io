@@ -9,6 +9,8 @@ if [[ "$1" == "--force" ]]; then
     FORCE_MODE=true
 fi
 
+DISK_BEFORE=$(df --output=used / | tail -n1)
+
 echo "=== 🔍 Safe System Cleanup: Предварительный анализ ==="
 echo
 
@@ -28,7 +30,7 @@ fi
 
 echo "📝 Systemd-журналы:"
 if journalctl --disk-usage &>/dev/null; then
-    JOURNAL_SIZE=$(journalctl --disk-usage | awk '{print $6}')
+    JOURNAL_SIZE=$(LANG=C journalctl --disk-usage | awk '{print $6}')
     echo " - Текущий объем логов: $JOURNAL_SIZE" | tee -a "$TEMP_FILE"
     echo " - Будет удалено всё старше 10 дней и сверх 500MB" | tee -a "$TEMP_FILE"
 else
@@ -107,9 +109,14 @@ if command -v snap &>/dev/null; then
     done
 fi
 
+DISK_AFTER=$(df --output=used / | tail -n1)
+FREED=$(( (DISK_BEFORE - DISK_AFTER) / 1024 ))
+
 echo
 echo "💽 Место на диске после:"
 df -h
 
+echo
+echo "📊 Освобождено приблизительно: ${FREED} MB"
 echo
 echo "✅ Очистка завершена."
