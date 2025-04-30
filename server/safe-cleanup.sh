@@ -30,8 +30,7 @@ fi
 
 echo "📝 Systemd-журналы:"
 if journalctl --disk-usage &>/dev/null; then
-    JOURNAL_SIZE=$(LANG=C journalctl --disk-usage | awk '{print $6 $7}')
-
+    JOURNAL_SIZE=$(LANG=C journalctl --disk-usage | grep 'take up' | awk '{print $6 $7}')
     echo " - Текущий объем логов: $JOURNAL_SIZE" | tee -a "$TEMP_FILE"
     echo " - Будет удалено всё старше 10 дней и сверх 500MB" | tee -a "$TEMP_FILE"
 else
@@ -105,8 +104,10 @@ fi
 
 if command -v snap &>/dev/null; then
     snap list --all | awk '/disabled/{print $1, $2}' | while read snapname revision; do
-        echo "Удаляю $snapname revision $revision..."
-        snap remove "$snapname" --revision="$revision"
+        if [[ "$revision" =~ ^[0-9]+$ ]]; then
+            echo "Удаляю $snapname revision $revision..."
+            snap remove "$snapname" --revision="$revision"
+        fi
     done
 fi
 
