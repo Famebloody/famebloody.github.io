@@ -30,7 +30,8 @@ fi
 
 echo "📝 Systemd-журналы:"
 if journalctl --disk-usage &>/dev/null; then
-    JOURNAL_SIZE=$(journalctl --disk-usage | grep 'take up' | awk '{print $(NF-1) $NF}')
+    JOURNAL_SIZE=$(LANG=C journalctl --disk-usage | awk '{print $6 $7}')
+
     echo " - Текущий объем логов: $JOURNAL_SIZE" | tee -a "$TEMP_FILE"
     echo " - Будет удалено всё старше 10 дней и сверх 500MB" | tee -a "$TEMP_FILE"
 else
