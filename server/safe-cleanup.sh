@@ -13,7 +13,6 @@ DISK_BEFORE=$(df --output=used / | tail -n1)
 
 echo "=== 🔍 Safe System Cleanup: Предварительный анализ ==="
 echo
-
 > "$TEMP_FILE"
 
 echo "💽 Место на диске до:" | tee -a "$TEMP_FILE"
@@ -70,6 +69,41 @@ fi
 
 echo
 echo "🧾 Резюме записано в: $TEMP_FILE"
+echo
+
+echo "📊 Ожидаемый объём очистки:"
+TOTAL_ESTIMATE=0
+
+if command -v docker &>/dev/null; then
+    DOCKER_RECLAIM=$(docker system df | grep 'Images' | awk '{print $4}')
+    echo " - Docker: ~$DOCKER_RECLAIM"
+fi
+
+if [ -d /var/cache/apt ]; then
+    APT_BYTES=$(du -sb /var/cache/apt | awk '{print $1}')
+    APT_MB=$((APT_BYTES / 1024 / 1024))
+    TOTAL_ESTIMATE=$((TOTAL_ESTIMATE + APT_MB))
+    echo " - APT кэш: ~${APT_MB}MB"
+fi
+
+if [ -d ~/.cache ]; then
+    CACHE_BYTES=$(du -sb ~/.cache | awk '{print $1}')
+    CACHE_MB=$((CACHE_BYTES / 1024 / 1024))
+    TOTAL_ESTIMATE=$((TOTAL_ESTIMATE + CACHE_MB))
+    echo " - Кэш пользователя: ~${CACHE_MB}MB"
+fi
+
+if journalctl --disk-usage &>/dev/null; then
+    LOG_BYTES=$(journalctl --disk-usage | grep 'take up' | awk '{print $(NF-1)}')
+    LOG_MB=${LOG_BYTES%.*}
+    if [[ "$LOG_MB" =~ ^[0-9]+$ ]]; then
+        EST_LOG_MB=$((LOG_MB > 500 ? LOG_MB - 500 : 0))
+        TOTAL_ESTIMATE=$((TOTAL_ESTIMATE + EST_LOG_MB))
+        echo " - Systemd-журналы: ~${EST_LOG_MB}MB"
+    fi
+fi
+
+echo " ≈ Общий предварительный объём: ~${TOTAL_ESTIMATE}MB"
 echo
 
 if ! $FORCE_MODE; then
