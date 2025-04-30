@@ -2,6 +2,7 @@
 
 | Script Name | Command |
 |-------------|---------|
+| dashboard.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dashboard.sh)` |
 | dashboard_old.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dashboard_old.sh)` |
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 | dest2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest2.sh)` |
@@ -10,6 +11,7 @@
 | init.sh | `bash <(wget -qO- https://dignezzz.github.io/server/init.sh)` |
 | mtu.sh | `bash <(wget -qO- https://dignezzz.github.io/server/mtu.sh)` |
 | reality.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality.sh)` |
+| safe-cleanup.sh | `bash <(wget -qO- https://dignezzz.github.io/server/safe-cleanup.sh)` |
 | security.sh | `bash <(wget -qO- https://dignezzz.github.io/server/security.sh)` |
 | sni.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni.sh)` |
 | sni2.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni2.sh)` |
@@ -21,4 +23,4 @@
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
-_Last updated at Thu Apr 24 10:58:53 MSK 2025_ 
+_Last updated at Wed Apr 30 15:51:59 MSK 2025_ 
