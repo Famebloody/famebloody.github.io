@@ -110,27 +110,6 @@ if is_port_in_use "$new_port"; then
 fi
 
 
-    read -p "Enter a new port for SSH (1-65535): " new_port
-
-    # Validate input
-    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
-        echo -e "\e[31mInvalid port number. Must be between 1 and 65535.\e[0m"
-        continue
-    fi
-
-    if [ "$new_port" = "$current_port" ]; then
-        echo -e "\e[33mThe new port is the same as the current SSH port. No changes needed.\e[0m"
-        exit 0
-    fi
-
-    if is_port_in_use "$new_port"; then
-        echo -e "\e[31mPort $new_port is already in use. Please choose another port.\e[0m"
-        continue
-    fi
-
-    break
-done
-
 backup_file "$SSHD_CONFIG"
 change_port_in_config "$SSHD_CONFIG" "$new_port"
 
