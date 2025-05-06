@@ -10,4 +10,4 @@
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 
-_Last updated at Wed Apr 30 15:51:59 MSK 2025_ 
+_Last updated at Tue May  6 15:08:23 MSK 2025_ 
