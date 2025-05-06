@@ -84,16 +84,12 @@ test_port_reachable() {
 
 configure_ufw() {
     if command -v ufw >/dev/null 2>&1; then
-        if ufw status | grep -q 'Status: active'; then
-            if ! ufw status | grep -q "$1"; then
-                log "\e[34mAdding SSH port $1 to UFW rules...\e[0m"
-                ufw allow "$1"/tcp
-                log "\e[32mPort $1 added to UFW rules.\e[0m"
-            else
-                log "\e[33mPort $1 already allowed in UFW.\e[0m"
-            fi
+        if ! ufw status | grep -q "$1"; then
+            log "\e[34mAdding SSH port $1 to UFW rules (active or not)...\e[0m"
+            ufw allow "$1"/tcp
+            log "\e[32mPort $1 added to UFW rules.\e[0m"
         else
-            log "\e[33mUFW is installed but not active. Skipping firewall rule.\e[0m"
+            log "\e[33mPort $1 already allowed in UFW.\e[0m"
         fi
     else
         log "\e[33mUFW is not installed. Skipping firewall rule.\e[0m"
@@ -116,7 +112,6 @@ remove_old_port_from_ufw() {
     fi
 }
 
-
 # ---------------- MAIN ---------------- #
 
 check_root
@@ -126,6 +121,7 @@ SSHD_CONFIG="/etc/ssh/sshd_config"
 SOCKET_FILE="/lib/systemd/system/ssh.socket"
 
 AUTO_YES=0
+REMOVE_OLD_PORT=0
 NEW_PORT=""
 
 # Флаги
@@ -138,6 +134,10 @@ while [[ $# -gt 0 ]]; do
         --port)
             NEW_PORT="$2"
             shift 2
+            ;;
+        --remove-old-port)
+            REMOVE_OLD_PORT=1
+            shift
             ;;
         *)
             log "\e[31mUnknown option: $1\e[0m"
@@ -193,17 +193,17 @@ configure_ufw "$NEW_PORT"
 if [ $status -eq 0 ]; then
     log "\e[32mSSH service restarted successfully.\e[0m"
 
-    # Предложить удалить старый порт из UFW, если всё прошло успешно
     if [ "$AUTO_YES" -eq 0 ]; then
         read -p "Remove old SSH port $current_port from UFW? [y/N]: " answer
         if [[ "$answer" =~ ^[Yy]$ ]]; then
             remove_old_port_from_ufw "$current_port"
         fi
+    elif [ "$REMOVE_OLD_PORT" -eq 1 ]; then
+        remove_old_port_from_ufw "$current_port"
     fi
 else
     log "\e[31mFailed to restart SSH service.\e[0m"
     exit 1
 fi
-
 
 test_port_reachable "$NEW_PORT"
