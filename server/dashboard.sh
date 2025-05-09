@@ -35,16 +35,18 @@ install_motd_config() {
     cat > "$MOTD_CONFIG_TOOL" << 'EOF'
 #!/bin/bash
 
-CONFIG_GLOBAL="$CONFIG_GLOBAL"
+CONFIG_GLOBAL="/etc/motdrc"
 CONFIG_USER="$HOME/.motdrc"
 TARGET_FILE="$CONFIG_GLOBAL"
 
-if [ ! -w "$CONFIG_GLOBAL" ]; then
-  echo "⚠️ Нет прав на $CONFIG_GLOBAL, используем $CONFIG_USER"
-  TARGET_FILE="$CONFIG_USER"
-fi
+[ ! -w "$CONFIG_GLOBAL" ] && TARGET_FILE="$CONFIG_USER"
 
-declare -a OPTIONS=(
+DASHBOARD_FILE_GLOBAL="/etc/update-motd.d/99-dashboard"
+DASHBOARD_FILE_USER="$HOME/.config/neonode/99-dashboard"
+TOOL_PATH_GLOBAL="/usr/local/bin/motd-config"
+TOOL_PATH_USER="$HOME/.local/bin/motd-config"
+
+OPTIONS=(
   SHOW_UPTIME
   SHOW_LOAD
   SHOW_CPU
@@ -59,18 +61,57 @@ declare -a OPTIONS=(
   SHOW_AUTOUPDATES
 )
 
-echo "🔧 Настройка NeoNode MOTD"
-echo "Выбери блоки для отображения (y/n):"
+print_menu() {
+  echo "🔧 Настройка NeoNode MOTD"
+  echo "1) Настроить отображаемые блоки"
+  echo "2) Удалить MOTD-дашборд"
+  echo "0) Выход"
+}
 
-for VAR in "${OPTIONS[@]}"; do
-  DEFAULT="true"
-  read -p "$VAR (y/n) [Y]: " val
-  case "${val,,}" in
-    y|"") echo "$VAR=true" ;;
-    n)    echo "$VAR=false" ;;
-    *)    echo "$VAR=$DEFAULT" ;;
+configure_blocks() {
+  echo "Выбери блоки для отображения (y/n):"
+  for VAR in "${OPTIONS[@]}"; do
+    read -p "$VAR (y/n) [Y]: " val
+    case "${val,,}" in
+      y|"") echo "$VAR=true" ;;
+      n)    echo "$VAR=false" ;;
+      *)    echo "$VAR=true" ;;
+    esac
+  done > "$TARGET_FILE"
+  echo "✅ Настройки сохранены в $TARGET_FILE"
+}
+
+uninstall_dashboard() {
+  echo "⚠️ Это удалит MOTD-дашборд, CLI и все настройки."
+  read -p "Ты уверен? (y/N): " confirm
+  if [[ "$confirm" =~ ^[Yy]$ ]]; then
+    echo "🗑 Удаляем дашборд и конфиги..."
+
+    sudo rm -f "$DASHBOARD_FILE_GLOBAL"
+    rm -f "$DASHBOARD_FILE_USER"
+
+    sudo rm -f "$TOOL_PATH_GLOBAL"
+    rm -f "$TOOL_PATH_USER"
+
+    sudo rm -f "$CONFIG_GLOBAL"
+    rm -f "$CONFIG_USER"
+
+    echo "✅ Всё удалено. MOTD вернётся к стандартному виду."
+  else
+    echo "❌ Отмена удаления."
+  fi
+}
+
+while true; do
+  print_menu
+  read -p "Выбор: " choice
+  case "$choice" in
+    1) configure_blocks ;;
+    2) uninstall_dashboard ;;
+    0) exit ;;
+    *) echo "❌ Неверный ввод" ;;
   esac
-done > "$TARGET_FILE"
+done 
 
 echo "✅ Настройки сохранены в $TARGET_FILE"
 EOF
@@ -134,7 +175,7 @@ cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
 
 
-CURRENT_VERSION="2025.04.30_build32"
+CURRENT_VERSION="2025.05.09"
 REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
 REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
 
