@@ -4,4 +4,4 @@
 |-------------|---------|
 | backup.sh | `bash <(wget -qO- https://dignezzz.github.io/shm/backup/backup.sh)` |
 
-_Last updated at Mon May 19 10:31:54 MSK 2025_ 
+_Last updated at Mon May 19 10:33:01 MSK 2025_ 
