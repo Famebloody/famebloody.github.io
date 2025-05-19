@@ -54,13 +54,13 @@ bash <(wget -qO- https://dignezzz.github.io/shm/backup/backup.sh)
 После установки скрипт сохраняется в директории SHM как `backup.sh`. Для запуска выполните:
 
 ```bash
-/opt/shm/backup.sh
+bash /opt/shm/backup.sh
 ```
 
 или
 
 ```bash
-/root/shm/backup.sh
+bash /root/shm/backup.sh
 ```
 
 (в зависимости от выбранного пути).
