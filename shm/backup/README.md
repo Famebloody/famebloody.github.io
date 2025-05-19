@@ -185,8 +185,3 @@ MIT License
 ## 👨‍💻 Автор
 
 [dignezzz](https://github.com/dignezzz)
-
-
-
-
-```
