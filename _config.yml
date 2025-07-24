@@ -1,6 +1,6 @@
-title: "DigneZzZ Scripts"
-description: "Скрипты, гайды и утилиты от DigneZzZ"
+title: "FameBloody Scripts (forked from DigneZzZ)"
+description: "Скрипты, гайды и утилиты от FameBloody"
 baseurl: ""
-url: "https://dignezzz.github.io"
+url: "https://famebloody.github.io"
 theme: null
 markdown: kramdown

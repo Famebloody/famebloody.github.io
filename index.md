@@ -1,6 +1,6 @@
 ---
 layout: default
-title: DigneZzZ Script Hub
+title: Famebloody Script Hub (forked from DigneZzZ)
 ---
 
 <!-- Tailwind CSS -->
@@ -36,7 +36,7 @@ title: DigneZzZ Script Hub
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition duration-300">
   <!-- Навбар -->
   <header class="px-6 py-4 bg-white dark:bg-gray-800 shadow flex justify-between items-center">
-    <div class="text-xl font-semibold">🧠 DigneZzZ Script Hub</div>
+    <div class="text-xl font-semibold">🧠 Famebloody Script Hub (forked from DigneZzZ)</div>
     <div class="flex gap-4 text-sm">
       <a href="https://openode.xyz" class="hover:underline">Forum</a>
       <a href="https://openode.xyz/subscriptions/" class="hover:underline">Clubs</a>
@@ -47,7 +47,7 @@ title: DigneZzZ Script Hub
 
   <!-- Контент -->
   <main class="max-w-4xl mx-auto px-6 py-10">
-    <h1 class="text-3xl font-bold mb-6 text-center">🧠 DigneZzZ Script Hub</h1>
+    <h1 class="text-3xl font-bold mb-6 text-center">🧠 Famebloody Script Hub (forked from DigneZzZ)</h1>
     <p class="text-center text-gray-600 dark:text-gray-400 mb-12">
       A curated collection of scripts, tools, and automation guides.
     </p>

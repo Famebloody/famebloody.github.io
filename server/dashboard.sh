@@ -20,14 +20,12 @@ for arg in "$@"; do
     esac
 done
 
-
 if [ "$INSTALL_USER_MODE" = true ]; then
     DASHBOARD_FILE="$HOME/.config/neonode/99-dashboard"
     MOTD_CONFIG_TOOL="$HOME/.local/bin/motd-config"
     CONFIG_GLOBAL="$HOME/.motdrc"
     mkdir -p "$(dirname "$DASHBOARD_FILE")" "$(dirname "$MOTD_CONFIG_TOOL")"
 fi
-
 
 # === Функция: Установка CLI утилиты motd-config ===
 install_motd_config() {
@@ -148,54 +146,135 @@ if [ "$EUID" -ne 0 ] && [ "$INSTALL_USER_MODE" = false ]; then
     echo "❌ Пожалуйста, запусти от root или с флагом --not-root"
     exit 1
 fi
+
 TMP_FILE=$(mktemp)
 
-# === Проверка зависимостей, если не root ===
-if [ "$EUID" -ne 0 ]; then
-    MISSING=()
-    for CMD in curl hostname awk grep cut uname df free top ip uptime vnstat; do
-        if ! command -v "$CMD" &>/dev/null; then
-            MISSING+=("$CMD")
-        fi
-    done
-    if (( ${#MISSING[@]} )); then
-        echo "❌ Не хватает обязательных утилит: ${MISSING[*]}"
-        echo "🛠 Пожалуйста, установи их командой (под root):"
-        echo "    sudo apt install curl coreutils net-tools procps iproute2 vnstat -y"
-        echo "🔁 После этого снова запусти установку."
-        exit 1
+# === Проверка зависимостей для всех пользователей ===
+echo "🔍 Проверка необходимых утилит..."
+MISSING=()
+OPTIONAL_MISSING=()
+
+# Обязательные утилиты
+for CMD in curl hostname awk grep cut uname df free uptime; do
+    if ! command -v "$CMD" &>/dev/null; then
+        MISSING+=("$CMD")
     fi
+done
+
+# Опциональные утилиты (не критичные)
+for CMD in top ip vnstat; do
+    if ! command -v "$CMD" &>/dev/null; then
+        OPTIONAL_MISSING+=("$CMD")
+    fi
+done
+
+# Проверяем критичные утилиты
+if (( ${#MISSING[@]} )); then
+    echo "❌ Не хватает обязательных утилит: ${MISSING[*]}"
+    echo "🛠 Установите их командой:"
+    if [ "$EUID" -eq 0 ]; then
+        echo "    apt update && apt install curl coreutils net-tools procps iproute2 -y"
+    else
+        echo "    sudo apt update && sudo apt install curl coreutils net-tools procps iproute2 -y"
+    fi
+    echo "🔁 После этого снова запустите установку."
+    exit 1
+fi
+
+# Предупреждаем об опциональных утилитах
+if (( ${#OPTIONAL_MISSING[@]} )); then
+    echo "⚠️ Отсутствуют опциональные утилиты: ${OPTIONAL_MISSING[*]}"
+    echo "💡 Для полной функциональности рекомендуется установить:"
+    if [ "$EUID" -eq 0 ]; then
+        echo "    apt install vnstat sysstat iproute2 -y"
+    else
+        echo "    sudo apt install vnstat sysstat iproute2 -y"
+    fi
+    echo "📝 Скрипт будет работать без них, но с ограниченной функциональностью."
+    
+    # Предлагаем автоматическую установку
+    if [ "$FORCE_MODE" = false ]; then
+        read -p "🤖 Установить опциональные пакеты автоматически? [y/N]: " install_optional
+        if [[ "$install_optional" =~ ^[Yy]$ ]]; then
+            echo "📦 Устанавливаем опциональные пакеты..."
+            if [ "$EUID" -eq 0 ]; then
+                apt update >/dev/null 2>&1
+                apt install vnstat sysstat iproute2 -y
+            else
+                sudo apt update >/dev/null 2>&1
+                sudo apt install vnstat sysstat iproute2 -y
+            fi
+            
+            # Инициализируем vnstat если установлен
+            if command -v vnstat >/dev/null 2>&1; then
+                echo "🔧 Инициализируем vnstat..."
+                # Определяем основной сетевой интерфейс
+                MAIN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
+                if [ -n "$MAIN_IF" ]; then
+                    if [ "$EUID" -eq 0 ]; then
+                        vnstat -i "$MAIN_IF" --create >/dev/null 2>&1
+                        systemctl enable vnstat >/dev/null 2>&1
+                        systemctl start vnstat >/dev/null 2>&1
+                    else
+                        sudo vnstat -i "$MAIN_IF" --create >/dev/null 2>&1
+                        sudo systemctl enable vnstat >/dev/null 2>&1
+                        sudo systemctl start vnstat >/dev/null 2>&1
+                    fi
+                    echo "✅ vnstat инициализирован для интерфейса $MAIN_IF"
+                fi
+            fi
+        fi
+    fi
+    echo ""
 fi
 
 # === Создание dashboard-файла ===
 if [ "$INSTALL_USER_MODE" = false ]; then
     mkdir -p /etc/update-motd.d
 fi
+
 cat > "$TMP_FILE" << 'EOF'
 #!/bin/bash
 
-
-CURRENT_VERSION="2025.05.09"
-REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
-REMOTE_VERSION=$(curl -s "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
-
-if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
-    echo "${warn} Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
-    echo "💡 Обновление: bash <(wget -qO- $REMOTE_URL) --force"
-    echo ""
+# ОПТИМИЗАЦИЯ: Проверка на быстрое отключение MOTD
+if [ -f "/tmp/.motd_disabled" ] || [ "$SSH_CLIENT_IP" = "DISABLED" ]; then
+    exit 0
 fi
 
+# ОПТИМИЗАЦИЯ: Таймаут для всех операций
+exec_with_timeout() {
+    timeout 3 "$@" 2>/dev/null || echo "timeout"
+}
+
+CURRENT_VERSION="2025.07.25"
+
+# ОПТИМИЗАЦИЯ: Проверка обновлений только раз в час
+UPDATE_CHECK_FILE="/tmp/.motd_update_check"
+if [ ! -f "$UPDATE_CHECK_FILE" ] || [ $(($(date +%s) - $(stat -c %Y "$UPDATE_CHECK_FILE" 2>/dev/null || echo 0))) -gt 3600 ]; then
+    REMOTE_URL="https://famebloody.github.io/server/dashboard.sh"
+    REMOTE_VERSION=$(exec_with_timeout curl -s --connect-timeout 2 "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
+    
+    if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
+        echo "⚠️ Доступна новая версия MOTD-дашборда: $REMOTE_VERSION (текущая: $CURRENT_VERSION)"
+        echo "💡 Обновление: bash <(wget -qO- $REMOTE_URL) --force"
+        echo ""
+    fi
+    
+    # Создаем файл отметки времени
+    touch "$UPDATE_CHECK_FILE" 2>/dev/null
+fi
 
 ok="✅"
 fail="❌"
 warn="⚠️"
 separator="─~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-CONFIG_GLOBAL="$CONFIG_GLOBAL"
+CONFIG_GLOBAL="/etc/motdrc"
 CONFIG_USER="$HOME/.motdrc"
 [ -f "$CONFIG_GLOBAL" ] && source "$CONFIG_GLOBAL"
 [ -f "$CONFIG_USER" ] && source "$CONFIG_USER"
 
+# Значения по умолчанию
 : "${SHOW_UPTIME:=true}"
 : "${SHOW_LOAD:=true}"
 : "${SHOW_CPU:=true}"
@@ -209,100 +288,170 @@ CONFIG_USER="$HOME/.motdrc"
 : "${SHOW_UPDATES:=true}"
 : "${SHOW_AUTOUPDATES:=true}"
 
-uptime_str=$(uptime -p)
-loadavg=$(cut -d ' ' -f1-3 /proc/loadavg)
-cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8 "%"}')
-mem_data=$(free -m | awk '/Mem:/ {printf "%.0f%% (%dMB/%dMB)", $3/$2*100, $3, $2}')
-disk_used=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
-disk_line=$(df -h / | awk 'NR==2 {print $5 " (" $3 " / " $2 ")"}')
-if [ "$disk_used" -ge 95 ]; then
-    disk_status="$fail $disk_line [CRITICAL: Free up space immediately!]"
-elif [ "$disk_used" -ge 85 ]; then
-    disk_status="$warn $disk_line [Warning: High usage]"
+# ОПТИМИЗАЦИЯ: Кэшируем данные на 30 секунд
+CACHE_FILE="/tmp/.motd_cache"
+CACHE_TIME=30
+
+if [ -f "$CACHE_FILE" ] && [ $(($(date +%s) - $(stat -c %Y "$CACHE_FILE"))) -lt $CACHE_TIME ]; then
+    source "$CACHE_FILE"
 else
-    disk_status="$ok $disk_line"
-fi
-
-traffic=$(vnstat --oneline 2>/dev/null | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
-ip_local=$(hostname -I | awk '{print $1}')
-ip_public=$(curl -s ifconfig.me || echo "n/a")
-ip6=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d/ -f1 | head -n1)
-[ -z "$ip6" ] && ip6="n/a"
-
-if command -v docker &>/dev/null; then
-    docker_total=$(docker ps -a -q | wc -l)
-    docker_running=$(docker ps -q | wc -l)
-    docker_stopped=$((docker_total - docker_running))
-    docker_msg="$ok ${docker_running} running / ${docker_stopped} stopped"
-    bad_containers=$(docker ps -a --filter "status=exited" --filter "status=restarting" --format '⛔ {{.Names}} ({{.Status}})')
-    if [ -n "$bad_containers" ]; then
-        docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped"
-        docker_msg_extra=$(echo "$bad_containers" | sed 's/^/                    /')
-    fi
-else
-    docker_msg="$warn not installed"
-fi
-
-ssh_users=$(who | wc -l)
-ssh_ips=$(who | awk '{print $5}' | tr -d '()' | sort | uniq | paste -sd ', ' -)
-
-if command -v fail2ban-client &>/dev/null; then
-    fail2ban_status="$ok active"
-else
-    fail2ban_status="$fail not installed"
-fi
-
-if command -v ufw &>/dev/null; then
-    ufw_status=$(ufw status | grep -i "Status" | awk '{print $2}')
-    if [[ "$ufw_status" == "active" ]]; then
-        ufw_status="$ok enabled"
+    # Собираем данные только если кэш устарел
+    uptime_str=$(exec_with_timeout uptime -p || echo "uptime unavailable")
+    loadavg=$(exec_with_timeout cat /proc/loadavg | cut -d ' ' -f1-3 || echo "load unavailable")
+    
+    # CPU usage с проверкой наличия top
+    if command -v top >/dev/null 2>&1; then
+        cpu_usage=$(exec_with_timeout top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8 "%"}' | head -1)
+        [ -z "$cpu_usage" ] && cpu_usage="n/a"
     else
-        ufw_status="$fail disabled"
+        cpu_usage="top not available"
     fi
-else
-    ufw_status="$fail not installed"
-fi
+    
+    mem_data=$(exec_with_timeout free -m | awk '/Mem:/ {printf "%.0f%% (%dMB/%dMB)", $3/$2*100, $3, $2}' || echo "memory info unavailable")
+    
+    disk_used=$(exec_with_timeout df -h / | awk 'NR==2 {print $5}' | tr -d '%' || echo "0")
+    disk_line=$(exec_with_timeout df -h / | awk 'NR==2 {print $5 " (" $3 " / " $2 ")"}' || echo "disk info unavailable")
+    
+    if [ "$disk_used" -ge 95 ] 2>/dev/null; then
+        disk_status="$fail $disk_line [CRITICAL: Free up space immediately!]"
+    elif [ "$disk_used" -ge 85 ] 2>/dev/null; then
+        disk_status="$warn $disk_line [Warning: High usage]"
+    else
+        disk_status="$ok $disk_line"
+    fi
 
-if systemctl is-active crowdsec &>/dev/null; then
-    crowdsec_status="$ok active"
-else
-    crowdsec_status="$fail not running"
-fi
-
-ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config | awk '{print $2}' | head -n1)
-[ -z "$ssh_port" ] && ssh_port=22
-[ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
-
-permit_root=$(sshd -T 2>/dev/null | grep -i permitrootlogin | awk '{print $2}')
-case "$permit_root" in
-    yes) root_login_status="$fail enabled" ;;
-    no) root_login_status="$ok disabled" ;;
-    *) root_login_status="$warn limited ($permit_root)" ;;
-esac
-
-password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config | awk '{print $2}')
-[ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
-
-updates=$(apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
-update_msg="${updates} package(s) can be updated"
-
-auto_update_status=""
-if dpkg -s unattended-upgrades &>/dev/null && command -v unattended-upgrade &>/dev/null; then
-    if grep -q 'Unattended-Upgrade "1";' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null; then
-        if systemctl is-enabled apt-daily.timer &>/dev/null && systemctl is-enabled apt-daily-upgrade.timer &>/dev/null; then
-            if grep -q "Installing" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null; then
-                auto_update_status="$ok working"
-            else
-                auto_update_status="$ok enabled"
-            fi
+    # ОПТИМИЗАЦИЯ: vnstat с проверкой установки и инициализации
+    if command -v vnstat >/dev/null 2>&1; then
+        # Проверяем, инициализирован ли vnstat
+        if vnstat -i eth0 --json >/dev/null 2>&1 || vnstat -i ens3 --json >/dev/null 2>&1; then
+            traffic=$(exec_with_timeout vnstat --oneline | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
+            [ -z "$traffic" ] && traffic="vnstat: no data yet"
         else
-            auto_update_status="$warn config enabled, timers disabled"
+            traffic="vnstat: not initialized (run: vnstat -i eth0 or similar)"
         fi
     else
-        auto_update_status="$warn installed, config disabled"
+        traffic="vnstat not installed"
     fi
-else
-    auto_update_status="$fail not installed"
+    
+    ip_local=$(exec_with_timeout hostname -I | awk '{print $1}' || echo "n/a")
+    
+    # ОПТИМИЗАЦИЯ: Публичный IP с коротким таймаутом
+    ip_public=$(exec_with_timeout curl -s --connect-timeout 1 --max-time 2 ifconfig.me || echo "n/a")
+    
+    # IPv6 с проверкой наличия ip команды
+    if command -v ip >/dev/null 2>&1; then
+        ip6=$(exec_with_timeout ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d/ -f1 | head -n1)
+    else
+        ip6="ip command not available"
+    fi
+    [ -z "$ip6" ] && ip6="n/a"
+
+    # Docker информация с проверкой доступности
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        docker_total=$(exec_with_timeout docker ps -a -q | wc -l)
+        docker_running=$(exec_with_timeout docker ps -q | wc -l)
+        docker_stopped=$((docker_total - docker_running))
+        docker_msg="$ok ${docker_running} running / ${docker_stopped} stopped"
+        
+        bad_containers=$(exec_with_timeout docker ps -a --filter "status=exited" --filter "status=restarting" --format '⛔ {{.Names}} ({{.Status}})' | head -3)
+        if [ -n "$bad_containers" ]; then
+            docker_msg="$fail Issues: $docker_running running / $docker_stopped stopped"
+            docker_msg_extra=$(echo "$bad_containers" | sed 's/^/                    /')
+        fi
+    else
+        docker_msg="$warn not available"
+    fi
+
+    ssh_users=$(exec_with_timeout who | wc -l)
+    ssh_ips=$(exec_with_timeout who | awk '{print $5}' | tr -d '()' | sort | uniq | paste -sd ', ' -)
+
+    # Безопасность с проверками
+    if command -v fail2ban-client >/dev/null 2>&1 && exec_with_timeout fail2ban-client status >/dev/null 2>&1; then
+        fail2ban_status="$ok active"
+    else
+        fail2ban_status="$fail not available"
+    fi
+
+    if command -v ufw >/dev/null 2>&1; then
+        ufw_status=$(exec_with_timeout ufw status | grep -i "Status" | awk '{print $2}')
+        if [[ "$ufw_status" == "active" ]]; then
+            ufw_status="$ok enabled"
+        else
+            ufw_status="$fail disabled"
+        fi
+    else
+        ufw_status="$fail not installed"
+    fi
+
+    if exec_with_timeout systemctl is-active crowdsec >/dev/null 2>&1; then
+        crowdsec_status="$ok active"
+    else
+        crowdsec_status="$fail not running"
+    fi
+
+    # SSH конфигурация
+    ssh_port=$(grep -Ei '^Port ' /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' | head -n1)
+    [ -z "$ssh_port" ] && ssh_port=22
+    [ "$ssh_port" != "22" ] && ssh_port_status="$ok non-standard port ($ssh_port)" || ssh_port_status="$warn default port (22)"
+
+    permit_root=$(exec_with_timeout sshd -T 2>/dev/null | grep -i permitrootlogin | awk '{print $2}')
+    case "$permit_root" in
+        yes) root_login_status="$fail enabled" ;;
+        no) root_login_status="$ok disabled" ;;
+        *) root_login_status="$warn limited ($permit_root)" ;;
+    esac
+
+    password_auth=$(grep -Ei '^PasswordAuthentication' /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}')
+    [ "$password_auth" != "yes" ] && password_auth_status="$ok disabled" || password_auth_status="$fail enabled"
+
+    # ОПТИМИЗАЦИЯ: Проверка обновлений с таймаутом
+    updates=$(exec_with_timeout apt list --upgradable 2>/dev/null | grep -v "Listing" | wc -l)
+    update_msg="${updates} package(s) can be updated"
+
+    # Автообновления
+    auto_update_status=""
+    if dpkg -s unattended-upgrades >/dev/null 2>&1 && command -v unattended-upgrade >/dev/null 2>&1; then
+        if grep -q 'Unattended-Upgrade "1";' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null; then
+            if exec_with_timeout systemctl is-enabled apt-daily.timer >/dev/null 2>&1 && exec_with_timeout systemctl is-enabled apt-daily-upgrade.timer >/dev/null 2>&1; then
+                if grep -q "Installing" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null; then
+                    auto_update_status="$ok working"
+                else
+                    auto_update_status="$ok enabled"
+                fi
+            else
+                auto_update_status="$warn config enabled, timers disabled"
+            fi
+        else
+            auto_update_status="$warn installed, config disabled"
+        fi
+    else
+        auto_update_status="$fail not installed"
+    fi
+
+    # Сохраняем в кэш
+    cat > "$CACHE_FILE" << CACHE_EOF
+uptime_str="$uptime_str"
+loadavg="$loadavg"
+cpu_usage="$cpu_usage"
+mem_data="$mem_data"
+disk_status="$disk_status"
+traffic="$traffic"
+ip_local="$ip_local"
+ip_public="$ip_public"
+ip6="$ip6"
+docker_msg="$docker_msg"
+docker_msg_extra="$docker_msg_extra"
+ssh_users="$ssh_users"
+ssh_ips="$ssh_ips"
+fail2ban_status="$fail2ban_status"
+ufw_status="$ufw_status"
+crowdsec_status="$crowdsec_status"
+ssh_port_status="$ssh_port_status"
+root_login_status="$root_login_status"
+password_auth_status="$password_auth_status"
+update_msg="$update_msg"
+auto_update_status="$auto_update_status"
+CACHE_EOF
 fi
 
 print_row() {
@@ -381,9 +530,10 @@ printf " %-20s : %s\n" "Dashboard Ver" "$CURRENT_VERSION"
 echo "$separator"
 printf " %-20s : %s\n" "Config tool" "motd-config"
 EOF
+
 clear
 echo "===================================================="
-echo "📋 Предпросмотр NeoNode MOTD (реальный вывод):"
+echo "📋 Предпросмотр NeoNode MOTD (оптимизированная версия):"
 echo "===================================================="
 bash "$TMP_FILE"
 echo "===================================================="
@@ -391,42 +541,55 @@ echo "===================================================="
 if [ "$FORCE_MODE" = true ]; then
     echo "⚙️ Автоматическая установка без подтверждения (--force)"
     mv "$TMP_FILE" "$DASHBOARD_FILE"
-if [ "$INSTALL_USER_MODE" = false ]; then
-    chmod +x "$DASHBOARD_FILE"
-fi
+    if [ "$INSTALL_USER_MODE" = false ]; then
+        chmod +x "$DASHBOARD_FILE"
+    fi
     install_motd_config
     create_motd_global_config
-    echo "✅ Установлен дашборд: $DASHBOARD_FILE"
+    echo "✅ Установлен оптимизированный дашборд: $DASHBOARD_FILE"
     echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
     echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
     echo ""
+    echo "🚀 ОПТИМИЗАЦИИ:"
+    echo "   • Кэширование данных на 30 секунд"
+    echo "   • Таймауты для всех команд (3 сек)"
+    echo "   • Проверка обновлений раз в час"
+    echo "   • Быстрое отключение через /tmp/.motd_disabled"
+    echo ""
     echo "👉 Для настройки отображения блоков — выполни: motd-config"
+    echo "👉 Для отключения MOTD: touch /tmp/.motd_disabled"
     echo "👉 Обновлённый MOTD появится при следующем входе"
 
 else
-    echo "Будет выполнена установка следующего набора:"
+    echo "Будет выполнена установка оптимизированного набора:"
     echo "👉 Будет установлен дашборд: $DASHBOARD_FILE"
     echo "👉 Будет установлена CLI утилита: $MOTD_CONFIG_TOOL"
     echo "👉 Будет создан глобальный конфиг: $CONFIG_GLOBAL"
-    echo "👉 Будут отлючены все остальные скрипты в папке /etc/update-motd.d/ чтобы не выводились"
-    read -p '❓ Установить этот MOTD-дэшборд? [y/N]: ' confirm
+    echo "👉 Будут отключены все остальные скрипты в папке /etc/update-motd.d/"
+    echo ""
+    echo "🚀 ОПТИМИЗАЦИИ:"
+    echo "   • Кэширование данных на 30 секунд"
+    echo "   • Таймауты для всех команд (3 сек)"
+    echo "   • Проверка обновлений раз в час"
+    echo "   • Быстрое отключение через /tmp/.motd_disabled"
+    echo ""
+    read -p '❓ Установить этот оптимизированный MOTD-дэшборд? [y/N]: ' confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         mv "$TMP_FILE" "$DASHBOARD_FILE"
-if [ "$INSTALL_USER_MODE" = false ]; then
-    chmod +x "$DASHBOARD_FILE"
-fi
         if [ "$INSTALL_USER_MODE" = false ]; then
+            chmod +x "$DASHBOARD_FILE"
             find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \;
         fi
-    install_motd_config
-    create_motd_global_config
-    
-    echo "✅ Установлен дашборд: $DASHBOARD_FILE"
-    echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
-    echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
-    echo ""
-    echo "👉 Для настройки отображения блоков — выполни: motd-config"
-    echo "👉 Обновлённый MOTD появится при следующем входе"
+        install_motd_config
+        create_motd_global_config
+        
+        echo "✅ Установлен оптимизированный дашборд: $DASHBOARD_FILE"
+        echo "✅ Установлена CLI утилита: $MOTD_CONFIG_TOOL"
+        echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
+        echo ""
+        echo "👉 Для настройки отображения блоков — выполни: motd-config"
+        echo "👉 Для отключения MOTD: touch /tmp/.motd_disabled"
+        echo "👉 Обновлённый MOTD появится при следующем входе"
     else
         echo "❌ Установка отменена."
         rm -f "$TMP_FILE"
