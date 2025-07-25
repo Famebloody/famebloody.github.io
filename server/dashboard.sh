@@ -578,11 +578,11 @@ print_section() {
     ip)           
       # Формируем строку с IP-адресами
       ip_info="Local: $ip_local / Public: $ip_public"
-      if [ "$netbird_ip" != "not installed" ]; then
-        ip_info="$ip_info / NetBird: $netbird_ip"
-      fi
       ip_info="$ip_info / IPv6: $ip6"
       print_row "IPv4/IPv6" "$ip_info"
+      if [ "$netbird_ip" != "not installed" ]; then
+        print_row "NetBird" "$netbird_ip"
+      fi
       ;;
     docker)
       print_row "Docker" "$docker_msg"
