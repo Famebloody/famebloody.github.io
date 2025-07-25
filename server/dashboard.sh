@@ -264,12 +264,12 @@ exec_with_timeout() {
     timeout 3 "$@" 2>/dev/null || echo "timeout"
 }
 
-CURRENT_VERSION="2025.05.09"
+CURRENT_VERSION="2025.07.25"
 
 # ОПТИМИЗАЦИЯ: Проверка обновлений только раз в час
 UPDATE_CHECK_FILE="/tmp/.motd_update_check"
 if [ ! -f "$UPDATE_CHECK_FILE" ] || [ $(($(date +%s) - $(stat -c %Y "$UPDATE_CHECK_FILE" 2>/dev/null || echo 0))) -gt 3600 ]; then
-    REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
+    REMOTE_URL="https://famebloody.github.io/server/dashboard.sh"
     REMOTE_VERSION=$(exec_with_timeout curl -s --connect-timeout 2 "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
     
     if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
