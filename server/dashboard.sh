@@ -203,41 +203,43 @@ if (( ${#OPTIONAL_MISSING[@]} )); then
     # Предлагаем автоматическую установку
     if [ "$FORCE_MODE" = false ] && [ -t 0 ]; then
         read -p "🤖 Установить опциональные пакеты автоматически? [y/N]: " install_optional < /dev/tty
-        if [[ "$install_optional" =~ ^[Yy]$ ]]; then
-            install_optional="y"
-        fi
     elif [ "$FORCE_MODE" = true ]; then
         echo "🤖 Автоматическая установка опциональных пакетов в pipe-режиме..."
         install_optional="y"
+    else
+        install_optional="n"
     fi
     
     if [[ "$install_optional" =~ ^[Yy]$ ]]; then
-            echo "📦 Устанавливаем опциональные пакеты..."
-            if [ "$EUID" -eq 0 ]; then
-                apt update >/dev/null 2>&1
-                apt install vnstat sysstat iproute2 -y
-            else
-                sudo apt update >/dev/null 2>&1
-                sudo apt install vnstat sysstat iproute2 -y
-            fi
+        echo "📦 Устанавливаем опциональные пакеты..."
+        if [ "$EUID" -eq 0 ]; then
+            apt update >/dev/null 2>&1
+            apt install vnstat sysstat iproute2 -y
+        else
+            sudo apt update >/dev/null 2>&1
+            sudo apt install vnstat sysstat iproute2 -y
+        fi
+        
+        # Инициализируем vnstat если установлен
+        if command -v vnstat >/dev/null 2>&1; then
+            echo "🔧 Инициализируем vnstat..."
+            # Определяем основной сетевой интерфейс
+            MAIN_IF=$(ip route | grep default | awk '{print $5}' | head -n1 2>/dev/null)
+            [ -z "$MAIN_IF" ] && MAIN_IF=$(ls /sys/class/net/ | grep -v lo | head -n1)
             
-            # Инициализируем vnstat если установлен
-            if command -v vnstat >/dev/null 2>&1; then
-                echo "🔧 Инициализируем vnstat..."
-                # Определяем основной сетевой интерфейс
-                MAIN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
-                if [ -n "$MAIN_IF" ]; then
-                    if [ "$EUID" -eq 0 ]; then
-                        vnstat -i "$MAIN_IF" --create >/dev/null 2>&1
-                        systemctl enable vnstat >/dev/null 2>&1
-                        systemctl start vnstat >/dev/null 2>&1
-                    else
-                        sudo vnstat -i "$MAIN_IF" --create >/dev/null 2>&1
-                        sudo systemctl enable vnstat >/dev/null 2>&1
-                        sudo systemctl start vnstat >/dev/null 2>&1
-                    fi
-                    echo "✅ vnstat инициализирован для интерфейса $MAIN_IF"
+            if [ -n "$MAIN_IF" ]; then
+                if [ "$EUID" -eq 0 ]; then
+                    vnstat -i "$MAIN_IF" --create >/dev/null 2>&1 || true
+                    systemctl enable vnstat >/dev/null 2>&1 || true
+                    systemctl start vnstat >/dev/null 2>&1 || true
+                else
+                    sudo vnstat -i "$MAIN_IF" --create >/dev/null 2>&1 || true
+                    sudo systemctl enable vnstat >/dev/null 2>&1 || true
+                    sudo systemctl start vnstat >/dev/null 2>&1 || true
                 fi
+                echo "✅ vnstat инициализирован для интерфейса $MAIN_IF"
+            else
+                echo "⚠️ Не удалось определить сетевой интерфейс для vnstat"
             fi
         fi
     fi
@@ -336,15 +338,10 @@ else
         disk_status="$ok $disk_line"
     fi
 
-    # ОПТИМИЗАЦИЯ: vnstat с проверкой установки и инициализации
+    # ОПТИМИЗАЦИЯ: vnstat как в оригинале
     if command -v vnstat >/dev/null 2>&1; then
-        # Проверяем, инициализирован ли vnstat
-        if vnstat -i eth0 --json >/dev/null 2>&1 || vnstat -i ens3 --json >/dev/null 2>&1; then
-            traffic=$(exec_with_timeout vnstat --oneline | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
-            [ -z "$traffic" ] && traffic="vnstat: no data yet"
-        else
-            traffic="vnstat: not initialized (run: vnstat -i eth0 or similar)"
-        fi
+        traffic=$(exec_with_timeout vnstat --oneline | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
+        [ -z "$traffic" ] && traffic="vnstat: no data yet"
     else
         traffic="vnstat not installed"
     fi
