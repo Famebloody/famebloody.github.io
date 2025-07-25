@@ -141,6 +141,14 @@ EOF
     fi
 }
 
+# === Проверка способа запуска ===
+if [ ! -t 0 ]; then
+    echo "🌐 Скрипт запущен через pipe (wget/curl). Включен автоматический режим."
+    FORCE_MODE=true
+    echo "💡 Для интерактивного режима скачайте скрипт: wget https://famebloody.github.io/server/dashboard.sh && bash dashboard.sh"
+    echo ""
+fi
+
 # === Проверка прав ===
 if [ "$EUID" -ne 0 ] && [ "$INSTALL_USER_MODE" = false ]; then
     echo "❌ Пожалуйста, запусти от root или с флагом --not-root"
@@ -193,9 +201,17 @@ if (( ${#OPTIONAL_MISSING[@]} )); then
     echo "📝 Скрипт будет работать без них, но с ограниченной функциональностью."
     
     # Предлагаем автоматическую установку
-    if [ "$FORCE_MODE" = false ]; then
-        read -p "🤖 Установить опциональные пакеты автоматически? [y/N]: " install_optional
+    if [ "$FORCE_MODE" = false ] && [ -t 0 ]; then
+        read -p "🤖 Установить опциональные пакеты автоматически? [y/N]: " install_optional < /dev/tty
         if [[ "$install_optional" =~ ^[Yy]$ ]]; then
+            install_optional="y"
+        fi
+    elif [ "$FORCE_MODE" = true ]; then
+        echo "🤖 Автоматическая установка опциональных пакетов в pipe-режиме..."
+        install_optional="y"
+    fi
+    
+    if [[ "$install_optional" =~ ^[Yy]$ ]]; then
             echo "📦 Устанавливаем опциональные пакеты..."
             if [ "$EUID" -eq 0 ]; then
                 apt update >/dev/null 2>&1
@@ -246,12 +262,12 @@ exec_with_timeout() {
     timeout 3 "$@" 2>/dev/null || echo "timeout"
 }
 
-CURRENT_VERSION="2025.07.25"
+CURRENT_VERSION="2025.05.09"
 
 # ОПТИМИЗАЦИЯ: Проверка обновлений только раз в час
 UPDATE_CHECK_FILE="/tmp/.motd_update_check"
 if [ ! -f "$UPDATE_CHECK_FILE" ] || [ $(($(date +%s) - $(stat -c %Y "$UPDATE_CHECK_FILE" 2>/dev/null || echo 0))) -gt 3600 ]; then
-    REMOTE_URL="https://famebloody.github.io/server/dashboard.sh"
+    REMOTE_URL="https://dignezzz.github.io/server/dashboard.sh"
     REMOTE_VERSION=$(exec_with_timeout curl -s --connect-timeout 2 "$REMOTE_URL" | grep '^CURRENT_VERSION=' | cut -d= -f2 | tr -d '"')
     
     if [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ]; then
@@ -573,7 +589,15 @@ else
     echo "   • Проверка обновлений раз в час"
     echo "   • Быстрое отключение через /tmp/.motd_disabled"
     echo ""
-    read -p '❓ Установить этот оптимизированный MOTD-дэшборд? [y/N]: ' confirm
+    
+    # Проверяем, есть ли интерактивный терминал
+    if [ -t 0 ]; then
+        read -p '❓ Установить этот оптимизированный MOTD-дэшборд? [y/N]: ' confirm < /dev/tty
+    else
+        echo "🤖 Автоматическая установка в pipe-режиме..."
+        confirm="y"
+    fi
+    
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         mv "$TMP_FILE" "$DASHBOARD_FILE"
         if [ "$INSTALL_USER_MODE" = false ]; then
