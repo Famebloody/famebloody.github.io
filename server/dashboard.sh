@@ -62,7 +62,9 @@ OPTIONS=(
 print_menu() {
   echo "🔧 Настройка NeoNode MOTD"
   echo "1) Настроить отображаемые блоки"
-  echo "2) Удалить MOTD-дашборд"
+  echo "2) Отключить/Включить MOTD"
+  echo "3) Обновить MOTD-дашборд"
+  echo "4) Удалить MOTD-дашборд"
   echo "0) Выход"
 }
 
@@ -79,6 +81,67 @@ configure_blocks() {
   echo "✅ Настройки сохранены в $TARGET_FILE"
 }
 
+toggle_motd() {
+  DISABLE_FILE="/tmp/.motd_disabled"
+  if [ -f "$DISABLE_FILE" ]; then
+    rm -f "$DISABLE_FILE"
+    echo "✅ MOTD включен. Будет отображаться при следующем входе."
+  else
+    touch "$DISABLE_FILE"
+    echo "❌ MOTD отключен. Создан файл $DISABLE_FILE"
+    echo "💡 Для включения запустите снова эту команду или удалите файл."
+  fi
+}
+
+update_dashboard() {
+  echo "🔄 Обновление MOTD-дашборда..."
+  REMOTE_URL="https://famebloody.github.io/server/dashboard.sh"
+  
+  # Проверяем доступность удаленного скрипта
+  if ! curl -s --connect-timeout 5 "$REMOTE_URL" >/dev/null; then
+    echo "❌ Не удалось подключиться к $REMOTE_URL"
+    echo "🌐 Проверьте интернет-соединение и попробуйте позже."
+    return 1
+  fi
+  
+  echo "📥 Скачиваем новую версию..."
+  if curl -s "$REMOTE_URL" | bash -s -- --force; then
+    echo "✅ MOTD-дашборд успешно обновлен!"
+  else
+    echo "❌ Ошибка при обновлении. Попробуйте вручную:"
+    echo "   bash <(curl -s $REMOTE_URL) --force"
+  fi
+}
+
+fix_duplicate_motd() {
+  echo "🔧 Исправление дублирования MOTD..."
+  
+  # Отключаем все MOTD скрипты кроме нашего
+  if [ -d "/etc/update-motd.d" ]; then
+    sudo find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \; 2>/dev/null
+    echo "✅ Отключены все MOTD скрипты кроме 99-dashboard"
+  fi
+  
+  # Проверяем и отключаем стандартные MOTD файлы
+  for file in /etc/motd /run/motd.dynamic; do
+    if [ -f "$file" ]; then
+      sudo mv "$file" "${file}.disabled" 2>/dev/null
+      echo "✅ Отключен файл: $file"
+    fi
+  done
+  
+  # Проверяем на дубликаты нашего скрипта
+  DASHBOARD_COUNT=$(find /etc/update-motd.d/ -name "*dashboard*" -type f | wc -l)
+  if [ "$DASHBOARD_COUNT" -gt 1 ]; then
+    echo "⚠️ Найдено $DASHBOARD_COUNT файлов dashboard!"
+    find /etc/update-motd.d/ -name "*dashboard*" -type f -exec ls -la {} \;
+    echo "🛠 Удаляем дубликаты, оставляем только 99-dashboard..."
+    sudo find /etc/update-motd.d/ -name "*dashboard*" -not -name "99-dashboard" -delete 2>/dev/null
+  fi
+  
+  echo "✅ Проблема дублирования исправлена!"
+}
+
 uninstall_dashboard() {
   echo "⚠️ Это удалит MOTD-дашборд, CLI и все настройки."
   read -p "Ты уверен? (y/N): " confirm
@@ -93,6 +156,24 @@ uninstall_dashboard() {
 
     sudo rm -f "$CONFIG_GLOBAL"
     rm -f "$CONFIG_USER"
+    
+    rm -f /tmp/.motd_disabled
+    rm -f /tmp/.motd_cache
+    rm -f /tmp/.motd_update_check
+
+    # Восстанавливаем стандартные MOTD файлы
+    for file in /etc/motd.disabled /run/motd.dynamic.disabled; do
+      if [ -f "$file" ]; then
+        original_file="${file%.disabled}"
+        sudo mv "$file" "$original_file" 2>/dev/null
+        echo "✅ Восстановлен файл: $original_file"
+      fi
+    done
+
+    # Включаем обратно стандартные MOTD скрипты
+    if [ -d "/etc/update-motd.d" ]; then
+      sudo find /etc/update-motd.d/ -type f -exec chmod +x {} \; 2>/dev/null
+    fi
 
     echo "✅ Всё удалено. MOTD вернётся к стандартному виду."
   else
@@ -105,10 +186,13 @@ while true; do
   read -p "Выбор: " choice
   case "$choice" in
     1) configure_blocks ;;
-    2) uninstall_dashboard ;;
+    2) toggle_motd ;;
+    3) update_dashboard ;;
+    4) uninstall_dashboard ;;
     0) exit ;;
     *) echo "❌ Неверный ввод" ;;
   esac
+  echo ""
 done 
 
 echo "✅ Настройки сохранены в $TARGET_FILE"
@@ -584,10 +668,10 @@ if [ "$FORCE_MODE" = true ]; then
     echo "   • Кэширование данных на 30 секунд"
     echo "   • Таймауты для всех команд (3 сек)"
     echo "   • Проверка обновлений раз в час"
-    echo "   • Быстрое отключение через /tmp/.motd_disabled"
+    echo "   • Управление через motd-config"
     echo ""
     echo "👉 Для настройки отображения блоков — выполни: motd-config"
-    echo "👉 Для отключения MOTD: touch /tmp/.motd_disabled"
+    echo "👉 Для отключения MOTD — выполни: motd-config"
     echo "👉 Обновлённый MOTD появится при следующем входе"
 
 else
@@ -601,7 +685,7 @@ else
     echo "   • Кэширование данных на 30 секунд"
     echo "   • Таймауты для всех команд (3 сек)"
     echo "   • Проверка обновлений раз в час"
-    echo "   • Быстрое отключение через /tmp/.motd_disabled"
+    echo "   • Управление через motd-config"
     echo ""
     
     # Проверяем, есть ли интерактивный терминал
@@ -616,7 +700,13 @@ else
         mv "$TMP_FILE" "$DASHBOARD_FILE"
         if [ "$INSTALL_USER_MODE" = false ]; then
             chmod +x "$DASHBOARD_FILE"
+            # Исправляем дублирование MOTD
             find /etc/update-motd.d/ -type f -not -name "99-dashboard" -exec chmod -x {} \;
+            # Отключаем стандартные MOTD файлы для предотвращения дублирования
+            [ -f "/etc/motd" ] && mv "/etc/motd" "/etc/motd.disabled" 2>/dev/null
+            [ -f "/run/motd.dynamic" ] && mv "/run/motd.dynamic" "/run/motd.dynamic.disabled" 2>/dev/null
+            # Удаляем возможные дубликаты dashboard
+            find /etc/update-motd.d/ -name "*dashboard*" -not -name "99-dashboard" -delete 2>/dev/null
         fi
         install_motd_config
         create_motd_global_config
@@ -626,7 +716,7 @@ else
         echo "✅ Создан глобальный конфиг: $CONFIG_GLOBAL"
         echo ""
         echo "👉 Для настройки отображения блоков — выполни: motd-config"
-        echo "👉 Для отключения MOTD: touch /tmp/.motd_disabled"
+        echo "👉 Для отключения MOTD — выполни: motd-config"
         echo "👉 Обновлённый MOTD появится при следующем входе"
     else
         echo "❌ Установка отменена."
