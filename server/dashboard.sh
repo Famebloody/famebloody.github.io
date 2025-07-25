@@ -262,7 +262,7 @@ exec_with_timeout() {
     timeout 3 "$@" 2>/dev/null || echo "timeout"
 }
 
-CURRENT_VERSION="2025.05.09"
+CURRENT_VERSION="2025.07.25"
 
 # ОПТИМИЗАЦИЯ: Проверка обновлений только раз в час
 UPDATE_CHECK_FILE="/tmp/.motd_update_check"
