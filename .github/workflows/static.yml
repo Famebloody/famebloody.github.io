@@ -28,7 +28,7 @@ jobs:
       - name: Set up Git config
         run: |
           git config user.name "GitHub Action"
-          git config user.email "dignezzz@gmail.com"
+          git config user.email "famebloody@gmail.com"
 
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -49,7 +49,7 @@ jobs:
               echo "|-------------|---------|" >> "$readme_path"
               for file in $(find "$dir" -type f -name "*.sh" | sort); do
                 script_name=$(basename "$file")
-                command="\`bash <(wget -qO- https://dignezzz.github.io/$file)\`"
+                command="\`bash <(wget -qO- https://famebloody.github.io/$file)\`"
                 echo "| $script_name | $command |" >> "$readme_path"
               done
               echo "" >> "$readme_path"
