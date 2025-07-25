@@ -402,7 +402,7 @@ else
     loadavg=$(exec_with_timeout cat /proc/loadavg | cut -d ' ' -f1-3 || echo "load unavailable")
     
     # CPU usage с проверкой наличия top
-    if command -v top >/dev/null 2>&1; then
+    if command -v top >/dev/null; then
         cpu_usage=$(exec_with_timeout top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8 "%"}' | head -1)
         [ -z "$cpu_usage" ] && cpu_usage="n/a"
     else
@@ -423,7 +423,7 @@ else
     fi
 
     # ОПТИМИЗАЦИЯ: vnstat как в оригинале
-    if command -v vnstat >/dev/null 2>&1; then
+    if command -v vnstat >/dev/null; then
         traffic=$(exec_with_timeout vnstat --oneline | awk -F\; '{print $10 " ↓ / " $11 " ↑"}')
         [ -z "$traffic" ] && traffic="vnstat: no data yet"
     else
@@ -436,7 +436,7 @@ else
     ip_public=$(exec_with_timeout curl -s --connect-timeout 1 --max-time 2 ifconfig.me || echo "n/a")
     
     # NetBird IP проверка
-    if command -v netbird >/dev/null 2>&1; then
+    if command -v netbird >/dev/null; then
         netbird_ip=$(exec_with_timeout netbird status | grep "NetBird IP:" | awk '{print $3}' | cut -d'/' -f1)
         [ -z "$netbird_ip" ] && netbird_ip="not connected"
     else
@@ -444,7 +444,7 @@ else
     fi
     
     # IPv6 с проверкой наличия ip команды
-    if command -v ip >/dev/null 2>&1; then
+    if command -v ip >/dev/null; then
         ip6=$(exec_with_timeout ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d/ -f1 | head -n1)
     else
         ip6="ip command not available"
@@ -452,7 +452,7 @@ else
     [ -z "$ip6" ] && ip6="n/a"
 
     # Docker информация с проверкой доступности
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if command -v docker >/dev/null && docker info >/dev/null; then
         docker_total=$(exec_with_timeout docker ps -a -q | wc -l)
         docker_running=$(exec_with_timeout docker ps -q | wc -l)
         docker_stopped=$((docker_total - docker_running))
@@ -471,13 +471,13 @@ else
     ssh_ips=$(exec_with_timeout who | awk '{print $5}' | tr -d '()' | sort | uniq | paste -sd ', ' -)
 
     # Безопасность с проверками
-    if command -v fail2ban-client >/dev/null 2>&1 && exec_with_timeout fail2ban-client status >/dev/null 2>&1; then
+    if command -v fail2ban-client >/dev/null && exec_with_timeout fail2ban-client status >/dev/null; then
         fail2ban_status="$ok active"
     else
         fail2ban_status="$fail not available"
     fi
 
-    if command -v ufw >/dev/null 2>&1; then
+    if command -v ufw >/dev/null; then
         ufw_status=$(exec_with_timeout ufw status | grep -i "Status" | awk '{print $2}')
         if [[ "$ufw_status" == "active" ]]; then
             ufw_status="$ok enabled"
@@ -488,7 +488,7 @@ else
         ufw_status="$fail not installed"
     fi
 
-    if exec_with_timeout systemctl is-active crowdsec >/dev/null 2>&1; then
+    if exec_with_timeout systemctl is-active crowdsec >/dev/null; then
         crowdsec_status="$ok active"
     else
         crowdsec_status="$fail not running"
@@ -515,9 +515,9 @@ else
 
     # Автообновления
     auto_update_status=""
-    if dpkg -s unattended-upgrades >/dev/null 2>&1 && command -v unattended-upgrade >/dev/null 2>&1; then
+    if dpkg -s unattended-upgrades >/dev/null && command -v unattended-upgrade >/dev/null; then
         if grep -q 'Unattended-Upgrade "1";' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null; then
-            if exec_with_timeout systemctl is-enabled apt-daily.timer >/dev/null 2>&1 && exec_with_timeout systemctl is-enabled apt-daily-upgrade.timer >/dev/null 2>&1; then
+            if exec_with_timeout systemctl is-enabled apt-daily.timer >/dev/null && exec_with_timeout systemctl is-enabled apt-daily-upgrade.timer >/dev/null; then
                 if grep -q "Installing" /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null; then
                     auto_update_status="$ok working"
                 else
