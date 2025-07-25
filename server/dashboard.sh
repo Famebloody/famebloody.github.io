@@ -287,7 +287,7 @@ fail="❌"
 warn="⚠️"
 separator="─~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-CONFIG_GLOBAL="/etc/motdrc"
+CONFIG_GLOBAL="$CONFIG_GLOBAL"
 CONFIG_USER="$HOME/.motdrc"
 [ -f "$CONFIG_GLOBAL" ] && source "$CONFIG_GLOBAL"
 [ -f "$CONFIG_USER" ] && source "$CONFIG_USER"
@@ -350,6 +350,14 @@ else
     
     # ОПТИМИЗАЦИЯ: Публичный IP с коротким таймаутом
     ip_public=$(exec_with_timeout curl -s --connect-timeout 1 --max-time 2 ifconfig.me || echo "n/a")
+    
+    # NetBird IP проверка
+    if command -v netbird >/dev/null 2>&1; then
+        netbird_ip=$(exec_with_timeout netbird status | grep "NetBird IP:" | awk '{print $3}' | cut -d'/' -f1)
+        [ -z "$netbird_ip" ] && netbird_ip="not connected"
+    else
+        netbird_ip="not installed"
+    fi
     
     # IPv6 с проверкой наличия ip команды
     if command -v ip >/dev/null 2>&1; then
@@ -451,6 +459,7 @@ disk_status="$disk_status"
 traffic="$traffic"
 ip_local="$ip_local"
 ip_public="$ip_public"
+netbird_ip="$netbird_ip"
 ip6="$ip6"
 docker_msg="$docker_msg"
 docker_msg_extra="$docker_msg_extra"
@@ -482,7 +491,15 @@ print_section() {
     ram)          print_row "RAM Usage" "$mem_data" ;;
     disk)         print_row "Disk Usage" "$disk_status" ;;
     net)          print_row "Net Traffic" "$traffic" ;;
-    ip)           print_row "IPv4/IPv6" "Local: $ip_local / Public: $ip_public / IPv6: $ip6" ;;
+    ip)           
+      # Формируем строку с IP-адресами
+      ip_info="Local: $ip_local / Public: $ip_public"
+      if [ "$netbird_ip" != "not installed" ]; then
+        ip_info="$ip_info / NetBird: $netbird_ip"
+      fi
+      ip_info="$ip_info / IPv6: $ip6"
+      print_row "IPv4/IPv6" "$ip_info"
+      ;;
     docker)
       print_row "Docker" "$docker_msg"
       [ -n "$docker_msg_extra" ] && echo -e "$docker_msg_extra"
