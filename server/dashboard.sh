@@ -361,7 +361,7 @@ exec_with_timeout() {
     fi
 }
 
-CURRENT_VERSION="2025.07.25"
+CURRENT_VERSION="2025.07.30"
 
 # ОПТИМИЗАЦИЯ: Проверка обновлений только раз в час
 UPDATE_CHECK_FILE="/tmp/.motd_update_check"
