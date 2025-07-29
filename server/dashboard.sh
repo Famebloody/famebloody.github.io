@@ -64,7 +64,8 @@ print_menu() {
   echo "1) Настроить отображаемые блоки"
   echo "2) Отключить/Включить MOTD"
   echo "3) Обновить MOTD-дашборд"
-  echo "4) Удалить MOTD-дашборд"
+  echo "4) Исправить дублирование MOTD"
+  echo "5) Удалить MOTD-дашборд"
   echo "0) Выход"
 }
 
@@ -188,7 +189,8 @@ while true; do
     1) configure_blocks ;;
     2) toggle_motd ;;
     3) update_dashboard ;;
-    4) uninstall_dashboard ;;
+    4) fix_duplicate_motd ;;
+    5) uninstall_dashboard ;;
     0) exit ;;
     *) echo "❌ Неверный ввод" ;;
   esac
