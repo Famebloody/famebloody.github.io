@@ -255,7 +255,9 @@ find_existing_motd_files() {
     done
     
     # Удаляем дубликаты и сортируем
-    printf '%s\n' "${files[@]}" | sort -u
+    if [[ ${#files[@]} -gt 0 ]]; then
+        printf '%s\n' "${files[@]}" | sort -u
+    fi
 }
 
 backup_existing_motd() {
@@ -281,6 +283,15 @@ backup_existing_motd() {
         fatal_error "Не удалось записать в файл манифеста: $backup_manifest"
     fi
     
+    # Получаем список файлов с безопасной обработкой ошибок
+    local motd_files_list
+    motd_files_list=$(find_existing_motd_files 2>/dev/null) || {
+        log_warning "Ошибка при поиске MOTD файлов, продолжаем без резервного копирования"
+        echo "# No files found due to error" >> "$backup_manifest"
+        return 0
+    }
+    
+    # Обрабатываем каждый файл
     while IFS= read -r original_file; do
         if [[ -n "$original_file" && -e "$original_file" ]]; then
             local backup_file="$backup_dir$(dirname "$original_file")"
@@ -307,7 +318,7 @@ backup_existing_motd() {
                 log_error "Ошибка копирования: $original_file"
             fi
         fi
-    done < <(find_existing_motd_files)
+    done <<< "$motd_files_list"
     
     if [[ $files_found -eq 0 ]]; then
         log_info "Существующие MOTD файлы не найдены"
@@ -346,6 +357,13 @@ remove_existing_motd() {
     log_info "Удаление существующих MOTD файлов..."
     local removed_count=0
     
+    # Получаем список файлов с безопасной обработкой ошибок
+    local motd_files_list
+    motd_files_list=$(find_existing_motd_files 2>/dev/null) || {
+        log_warning "Ошибка при поиске MOTD файлов для удаления"
+        return 0
+    }
+    
     while IFS= read -r file; do
         if [[ -n "$file" && -e "$file" ]]; then
             if rm -f "$file" 2>/dev/null; then
@@ -355,7 +373,7 @@ remove_existing_motd() {
                 log_warning "Не удалось удалить: $file"
             fi
         fi
-    done < <(find_existing_motd_files)
+    done <<< "$motd_files_list"
     
     # Отключаем исполняемые права для файлов в /etc/update-motd.d/
     if [[ -d "/etc/update-motd.d" && "$INSTALL_USER_MODE" == false ]]; then
