@@ -206,11 +206,23 @@ create_backup_directory() {
         backup_dir="$HOME/.motd_backups/$(date +%Y%m%d_%H%M%S)"
     fi
     
-    if ! mkdir -p "$backup_dir"; then
-        fatal_error "Не удалось создать директорию резервных копий: $backup_dir"
+    # Пытаемся создать директорию резервных копий
+    if ! mkdir -p "$backup_dir" 2>/dev/null; then
+        # Если не удалось создать в стандартном месте, создаем в домашней папке
+        backup_dir="$HOME/.motd_backups/$(date +%Y%m%d_%H%M%S)"
+        if ! mkdir -p "$backup_dir" 2>/dev/null; then
+            fatal_error "Не удалось создать директорию резервных копий: $backup_dir"
+        fi
+        log_warning "Создана резервная копия в домашней папке: $backup_dir"
+    else
+        log_info "Создана директория резервных копий: $backup_dir"
     fi
     
-    log_info "Создана директория резервных копий: $backup_dir"
+    # Проверяем, что директория действительно создана и доступна для записи
+    if [[ ! -d "$backup_dir" ]] || [[ ! -w "$backup_dir" ]]; then
+        fatal_error "Директория резервных копий недоступна для записи: $backup_dir"
+    fi
+    
     echo "$backup_dir"
 }
 
@@ -250,12 +262,24 @@ backup_existing_motd() {
     local backup_dir
     backup_dir=$(create_backup_directory)
     
+    # Проверяем, что backup_dir действительно получен
+    if [[ -z "$backup_dir" ]] || [[ ! -d "$backup_dir" ]]; then
+        fatal_error "Не удалось получить валидную директорию для резервных копий"
+    fi
+    
     local backup_manifest="$backup_dir/backup_manifest.txt"
     local files_found=0
     
     log_info "Начинаем резервное копирование существующих MOTD файлов..."
-    echo "# MOTD Backup Manifest - $(date)" > "$backup_manifest"
-    echo "# Original -> Backup" >> "$backup_manifest"
+    
+    # Создаем файл манифеста с проверкой ошибок
+    if ! echo "# MOTD Backup Manifest - $(date)" > "$backup_manifest" 2>/dev/null; then
+        fatal_error "Не удалось создать файл манифеста: $backup_manifest"
+    fi
+    
+    if ! echo "# Original -> Backup" >> "$backup_manifest" 2>/dev/null; then
+        fatal_error "Не удалось записать в файл манифеста: $backup_manifest"
+    fi
     
     while IFS= read -r original_file; do
         if [[ -n "$original_file" && -e "$original_file" ]]; then
@@ -269,14 +293,16 @@ backup_existing_motd() {
             fi
             
             # Копируем файл с сохранением всех атрибутов
-            if cp -a "$original_file" "$backup_file/"; then
-                echo "$original_file -> $backup_file/$filename" >> "$backup_manifest"
-                
-                # Сохраняем метаданные
-                stat "$original_file" > "$backup_file/$filename.metadata" 2>/dev/null || true
-                
-                log_info "Сохранён: $original_file"
-                ((files_found++))
+            if cp -a "$original_file" "$backup_file/" 2>/dev/null; then
+                if echo "$original_file -> $backup_file/$filename" >> "$backup_manifest" 2>/dev/null; then
+                    # Сохраняем метаданные
+                    stat "$original_file" > "$backup_file/$filename.metadata" 2>/dev/null || true
+                    
+                    log_info "Сохранён: $original_file"
+                    ((files_found++))
+                else
+                    log_warning "Не удалось записать в манифест: $original_file"
+                fi
             else
                 log_error "Ошибка копирования: $original_file"
             fi
@@ -297,8 +323,18 @@ backup_existing_motd() {
         latest_link="$BACKUP_BASE_DIR/latest"
     fi
     
-    rm -f "$latest_link" 2>/dev/null || true
-    ln -sf "$backup_dir" "$latest_link"
+    # Создаем ссылку только если директория для ссылки существует
+    local link_dir=$(dirname "$latest_link")
+    if [[ -d "$link_dir" ]] && [[ -w "$link_dir" ]]; then
+        rm -f "$latest_link" 2>/dev/null || true
+        if ln -sf "$backup_dir" "$latest_link" 2>/dev/null; then
+            log_info "Создана ссылка на последнюю резервную копию: $latest_link"
+        else
+            log_warning "Не удалось создать ссылку на резервную копию"
+        fi
+    else
+        log_warning "Нет прав для создания ссылки в: $link_dir"
+    fi
     
     log_info "Резервное копирование завершено. Файлов сохранено: $files_found"
     log_info "Резервная копия: $backup_dir"
@@ -642,7 +678,7 @@ toggle_motd() {
 
 update_dashboard() {
   echo "🔄 Обновление MOTD-дашборда..."
-  REMOTE_URL="https://famebloody.github.io/server/dashboard-refactored.sh"
+  local REMOTE_URL="https://famebloody.github.io/server/dashboard-refactored.sh"
   
   if ! curl -s --connect-timeout 5 "$REMOTE_URL" >/dev/null; then
     echo "❌ Не удалось подключиться к $REMOTE_URL"
@@ -687,7 +723,7 @@ fix_duplicate_motd() {
 
 restore_original_motd() {
   echo "🔄 Восстановление оригинального MOTD из резервной копии..."
-  bash <(curl -s https://famebloody.github.io/server/dashboard.sh) --restore
+  bash <(curl -s https://famebloody.github.io/server/dashboard-refactored.sh) --restore
 }
 
 uninstall_dashboard() {
