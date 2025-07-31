@@ -52,12 +52,12 @@ log_message() {
     # Записываем в лог
     echo "[$timestamp] [$level] $message" >> "$log_file" 2>/dev/null || true
     
-    # Выводим в терминал
+    # Выводим в терминал (всегда в stderr, чтобы не загрязнять stdout)
     case "$level" in
-        "ERROR")   echo "❌ $message" ;;
-        "WARNING") echo "⚠️ $message" ;;
-        "INFO")    echo "ℹ️ $message" ;;
-        *)         echo "$message" ;;
+        "ERROR")   echo "❌ $message" >&2 ;;
+        "WARNING") echo "⚠️ $message" >&2 ;;
+        "INFO")    echo "ℹ️ $message" >&2 ;;
+        *)         echo "$message" >&2 ;;
     esac
 }
 
